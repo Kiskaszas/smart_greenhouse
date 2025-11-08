@@ -1,0 +1,15 @@
+plantCode: PEPPER
+plantType: PEPPER
+temperatureRange: {min: 20, max: 30}
+humidityRangePct: {min: 50, max: 70}
+soilMoistureRangePct: {min: 45, max: 65}
+rules:
+  - metric: "temperature"
+    range: {min: 20, max: 30}
+    action: "VENT_OPEN"
+  - metric: "temperature"
+    range: {min: 20, max: 30}
+    action: "SHADE_ON"
+  - metric: "soilMoisturePct"
+    range: {min: 45, max: 65}
+    action: "IRRIGATION_ON"

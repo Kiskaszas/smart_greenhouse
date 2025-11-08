@@ -1,0 +1,46 @@
+package org.greenhouse.smart_greenhouse_backend.service.control;
+
+import org.greenhouse.smart_greenhouse_backend.dto.ControlStateDto;
+import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
+import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
+
+import java.util.List;
+
+public interface ControlService {
+
+    void evaluateAndControl(
+            final String greenhouseCode,
+            final WeatherDto weather,
+            final Double latestSoilMoisture
+    );
+
+    void manualCommand(
+            final String greehouseCode,
+            final String type,
+            final String action,
+            final Integer durationMin,
+            final String reason
+    );
+
+    /**
+     * Összes vezérlési esemény lekérése.
+     */
+    List<ControlEvent> getAllEvents();
+
+    /**
+     * Egy vezérlési esemény lekérése ID alapján.
+     */
+    ControlEvent getEventById(String id);
+
+    /**
+     * Aktuális vezérlési konfiguráció visszaadása DTO-ban.
+     */
+    ControlStateDto getControlState();
+
+    /**
+     * Összes vezérlési esemény lekérdezése az adott green housera a dedikált kódja alapján.
+     *
+     * @param greenhouseCode
+     */
+    List<ControlEvent> getAllEventsForGreenhouse(String greenhouseCode);
+}

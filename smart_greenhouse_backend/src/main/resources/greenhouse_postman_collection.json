@@ -1,0 +1,96 @@
+{
+  "info": {
+    "name": "Smart Greenhouse API",
+    "_postman_id": "12345678-abcd-efgh-ijkl-1234567890ab",
+    "description": "Teszt forgatókönyv a Smart Greenhouse backendhez",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Üvegház létrehozása",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Teszt Üvegház\",\n  \"location\": {\n    \"city\": \"Budapest\",\n    \"lat\": 47.4979,\n    \"lon\": 19.0402\n  },\n  \"plantProfileId\": \"profile123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/greenhouses",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "greenhouses"]
+        }
+      }
+    },
+    {
+      "name": "2. Összes üvegház listázása",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/greenhouses",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "greenhouses"]
+        }
+      }
+    },
+    {
+      "name": "3. Szenzoradat küldése",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"SOIL\",\n  \"value\": 28.5,\n  \"unit\": \"%\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/greenhouses/{{greenhouseId}}/sensors",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "greenhouses", "{{greenhouseId}}", "sensors"]
+        }
+      }
+    },
+    {
+      "name": "4. Aktuális időjárás",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/greenhouses/{{greenhouseId}}/weather/current",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "greenhouses", "{{greenhouseId}}", "weather", "current"]
+        }
+      }
+    },
+    {
+      "name": "7. Manuális vezérlési parancs",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"IRRIGATION\",\n  \"action\": \"START\",\n  \"durationMin\": 10\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/control/command",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "control", "command"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "greenhouseId",
+      "value": "replace-with-real-id"
+    }
+  ]
+}

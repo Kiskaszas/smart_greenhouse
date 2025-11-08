@@ -1,0 +1,15 @@
+plantCode: JALAPENO
+plantType: JALAPENO
+temperatureRange: {min: 22, max: 32}
+humidityRangePct: {min: 45, max: 65}
+soilMoistureRangePct: {min: 40, max: 60}
+rules:
+  - metric: "temperature"
+    range: {min: 22, max: 32}
+    action: "VENT_OPEN"
+  - metric: "temperature"
+    range: {min: 22, max: 32}
+    action: "SHADE_ON"
+  - metric: "soilMoisturePct"
+    range: {min: 40, max: 60}
+    action: "IRRIGATION_ON"

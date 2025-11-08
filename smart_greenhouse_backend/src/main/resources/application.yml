@@ -1,0 +1,53 @@
+#Generating 2048-bit RSA key pair and self-signed certificate (SHA384withRSA) with a validity of 3 650 days
+#        for: CN=viktor_kaszas, OU=kaszas, O=kaszas, L=Budapest, ST=Pest, C=Unknown
+server:
+  port: 8080
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+
+spring:
+  application:
+    name: smart-greenhouse-backend
+  data:
+    mongodb:
+      uri: mongodb://root:example@localhost:27017/greenhouse?authSource=admin
+      port: 0
+  main:
+    allow-bean-definition-overriding: true
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+    operationsSorter: method
+    tagsSorter: alpha
+
+weather:
+  provider: openweather
+  api-key: 62b50e7fb565bcfc870b6968805ad4b7
+  base-url: https://api.openweathermap.org/data/2.5
+  city: Budapest
+  units: metric
+
+irrigation:
+  enabled: true
+  threshold:
+    soilMoisture: 35 #%
+    temperature: 28 #c
+    windSpeed: 8 #m/s
+  min-duration-minutes: 5
+
+ventilation:
+  enabled: true
+  threshold:
+    temperature: 28
+    humidity: 80
+
+logging:
+  level:
+    root: INFO
+    org.greenhouse.smart_greenhouse_backend: DEBUG
