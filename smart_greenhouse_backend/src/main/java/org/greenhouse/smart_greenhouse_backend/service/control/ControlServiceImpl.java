@@ -3,6 +3,8 @@ package org.greenhouse.smart_greenhouse_backend.service.control;
 import lombok.RequiredArgsConstructor;
 import org.greenhouse.smart_greenhouse_backend.dto.ControlStateDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.ActionType;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.CommandType;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
 import org.greenhouse.smart_greenhouse_backend.repository.ControlEventRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,8 +48,8 @@ public class ControlServiceImpl implements ControlService {
                 && (weather.getPrecipitationMm() == null || weather.getPrecipitationMm() == 0.0)) {
             emitEvent(
                     greenhouseCode,
-                    "IRRIGATION",
-                    "START",
+                    CommandType.IRRIGATION,
+                    ActionType.START,
                     "Soil moisture low; safe weather",
                     irrigationMinDuration
             );
@@ -59,8 +61,8 @@ public class ControlServiceImpl implements ControlService {
                 || weather.getHumidity() >= ventilationHumidityThreshold)) {
             emitEvent(
                     greenhouseCode,
-                    "VENTILATION",
-                    "START",
+                    CommandType.VENTILATION,
+                    ActionType.START,
                     "High temp/humidity",
                     null);
         }
@@ -69,24 +71,24 @@ public class ControlServiceImpl implements ControlService {
     @Override
     public void manualCommand(
             String greenhouseCode,
-            String type,
-            String action,
+            CommandType commandType,
+            ActionType action,
             Integer durationMin,
             String reason
     ) {
-        emitEvent(greenhouseCode,type, action, reason, durationMin);
+        emitEvent(greenhouseCode, commandType, action, reason, durationMin);
     }
 
     private void emitEvent(
             final String greenhouseCode,
-            final String type,
-            final String action,
+            final CommandType commandType,
+            final ActionType action,
             final String reason,
             final Integer durationMin
     ) {
         ControlEvent event = ControlEvent.builder()
                 .timestamp(Instant.now())
-                .type(type)
+                .commandType(commandType)
                 .action(action)
                 .reason(reason)
                 .durationMin(durationMin)

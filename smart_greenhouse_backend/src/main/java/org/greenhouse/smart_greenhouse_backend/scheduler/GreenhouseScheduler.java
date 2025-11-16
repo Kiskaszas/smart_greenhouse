@@ -2,7 +2,6 @@ package org.greenhouse.smart_greenhouse_backend.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import org.greenhouse.smart_greenhouse_backend.service.greenhouse.GreenhouseService;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,7 +15,7 @@ public class GreenhouseScheduler {
     private final GreenhouseService greenhouseService;
 
     //@Scheduled(cron = "0 0/30 * * * *") // 30 percenként
-    @Scheduled(fixedRate = 120000)
+    //@Scheduled(fixedRate = 120000)
     public void pollAllGreenhouses() {
         greenhouseService.pollAllGreenhouses();
     }

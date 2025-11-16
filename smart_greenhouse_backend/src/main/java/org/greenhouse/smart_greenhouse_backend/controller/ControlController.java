@@ -10,7 +10,6 @@ import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
 import org.greenhouse.smart_greenhouse_backend.service.control.ControlService;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -24,7 +23,7 @@ public class ControlController {
     @Operation(summary = "Manuális vezérlési parancs küldése")
     @ApiResponse(responseCode = "200", description = "Parancs sikeresen végrehajtva és naplózva")
     @PostMapping("/command")
-    public void command(@Valid @RequestBody final CommandDto command) {
+    public void command(@RequestBody final CommandDto command) {
         service.manualCommand(
                 command.getGreenhouseCode(),
                 command.getType(),

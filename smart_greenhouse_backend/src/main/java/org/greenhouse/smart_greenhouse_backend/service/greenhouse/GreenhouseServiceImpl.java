@@ -54,7 +54,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                             newProfile.setRules(List.of());
                             return plantProfileRepository.save(newProfile);
                         });
-
+                
                 // itt tényleg az ID-t kell beállítani, nem a type-ot
                 greenhouse.setPlantProfileId(profile.getId());
             }
@@ -82,13 +82,12 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     @Override
     public Greenhouse getByCode(final String code) {
         return greenhouseRepository.findByCode(code)
-                .orElseThrow(() -> new RuntimeException("Greenhouse not found: " + code));
+                .orElseThrow(() -> new GreenhouseIsExistByCodeException("Greenhouse not found: " + code));
     }
 
     @Override
     public Greenhouse updateById(final String code, final Greenhouse updated) {
         Greenhouse existing = getByCode(code);
-
         existing.setName(updated.getName());
         existing.setPlantType(updated.getPlantType());
         existing.setActive(updated.isActive());
@@ -96,15 +95,18 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         existing.setSensors(updated.getSensors());
         existing.setDevices(updated.getDevices());
         existing.setPlantProfileId(updated.getPlantProfileId());
+
         return greenhouseRepository.save(existing);
     }
 
     @Override
     public void deleteByCode(final String code) {
-        if (!greenhouseRepository.existsByCode(code)) {
+        Greenhouse greenhouse = getByCode(code);
+        if(greenhouse != null) {
+            greenhouseRepository.deleteById(greenhouse.getId());
+        }else {
             throw new RuntimeException("Greenhouse not found: " + code);
         }
-        greenhouseRepository.deleteById(code);
     }
 
     @Override

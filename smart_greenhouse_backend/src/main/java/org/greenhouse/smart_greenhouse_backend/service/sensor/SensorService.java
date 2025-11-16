@@ -21,4 +21,13 @@ public interface SensorService {
      *         vagy üres, ha még nem érkezett adat
      */
     Optional<SensorData> latest();
+
+    /**
+     * A szenzoron hajt végre módosítást az Id alapján.
+     *
+     * @param sensorCode
+     * @param sensor
+     * @return
+     */
+    void updateByCode(String sensorCode, SensorData sensor);
 }

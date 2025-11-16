@@ -1,10 +1,9 @@
 package org.greenhouse.smart_greenhouse_backend.service.plan;
 
 import lombok.RequiredArgsConstructor;
-import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.PlannedEvent;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
-
+import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
 import org.greenhouse.smart_greenhouse_backend.repository.PlanRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -51,14 +50,11 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     public Plan createEmptyActivePlan(
-            final String greenhouseId,
-            final Instant validFrom,
-            final Instant validTo
-    ) {
+            final String greenhouseCode) {
         Plan plan = Plan.builder()
-                .greenhouseCode(greenhouseId)
-                .validFrom(validFrom)
-                .validTo(validTo)
+                .greenhouseCode(greenhouseCode)
+                .validFrom(Instant.now())
+                .validTo(Instant.now().plus(365, ChronoUnit.DAYS))
                 .active(true)
                 .build();
         return planRepository.save(plan);

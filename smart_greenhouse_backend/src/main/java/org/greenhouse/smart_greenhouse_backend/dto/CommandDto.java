@@ -2,6 +2,8 @@ package org.greenhouse.smart_greenhouse_backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.ActionType;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.CommandType;
 
 /**
  * Manuális vezérlési parancs DTO.
@@ -14,10 +16,10 @@ public class CommandDto {
     private String greenhouseCode;
 
     @NotBlank
-    private String type;       // IRRIGATION, VENTILATION, stb.
+    private CommandType type;       // IRRIGATION, VENTILATION, stb.
 
     @NotBlank
-    private String action;     // START, STOP, OPEN, CLOSE
+    private ActionType action;     // START, STOP, OPEN, CLOSE
 
     private Integer durationMin; // opcionális, ha időzített akció
 }

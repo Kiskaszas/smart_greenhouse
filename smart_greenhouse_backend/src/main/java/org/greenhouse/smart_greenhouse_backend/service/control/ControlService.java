@@ -2,6 +2,8 @@ package org.greenhouse.smart_greenhouse_backend.service.control;
 
 import org.greenhouse.smart_greenhouse_backend.dto.ControlStateDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.ActionType;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.CommandType;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
 
 import java.util.List;
@@ -16,8 +18,8 @@ public interface ControlService {
 
     void manualCommand(
             final String greehouseCode,
-            final String type,
-            final String action,
+            final CommandType type,
+            final ActionType action,
             final Integer durationMin,
             final String reason
     );

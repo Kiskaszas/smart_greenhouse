@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.greenhouse.smart_greenhouse_backend.service.greenhouse.GreenhouseService;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,7 +31,7 @@ public class SchedulerTasks {
      * akció (pl. öntözés bekapcsolása, szellőző nyitása) végrehajtásra kerül,
      * és bekerül az akciónaplóba.
      */
-    @Scheduled(fixedRate = 300000) // 5 perc
+    //@Scheduled(fixedRate = 300000) // 5 perc
     public void checkSensors() {
         service.evaluateRulesFromSensors();
     }
@@ -45,7 +44,7 @@ public class SchedulerTasks {
      * beavatkozás az üvegházban. Például ha a külső hőmérséklet túl magas,
      * akkor a szellőző és az árnyékoló automatikusan aktiválódhat.
      */
-    @Scheduled(fixedRate = 900000) // 15 perc
+    //@Scheduled(fixedRate = 900000) // 15 perc
     public void fetchWeather() {
         service.evaluateRulesFromWeather();
     }
@@ -59,7 +58,7 @@ public class SchedulerTasks {
      * javasolt SHADE_ON és VENT_OPEN"). Ezek a tervek segítenek a felhasználónak
      * előre látni a szükséges beavatkozásokat.
      */
-    @Scheduled(cron = "0 0 */12 * * *") // 12 óránként
+    //@Scheduled(cron = "0 0 */12 * * *") // 12 óránként
     public void generatePlans() {
         service.generatePlans();
     }

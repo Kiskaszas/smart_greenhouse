@@ -6,13 +6,13 @@ import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
 import org.greenhouse.smart_greenhouse_backend.service.greenhouse.GreenhouseService;
 import org.greenhouse.smart_greenhouse_backend.service.plan.PlanService;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.*;
-
-import java.time.Instant;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/greenhouses/{id}/plans")
+@RequestMapping("/api/greenhouses/plan")
 @RequiredArgsConstructor
 public class PlanController {
 
@@ -26,13 +26,11 @@ public class PlanController {
         return planService.getOrCreateActivePlan(greenhouse);
     }
 
-    @Operation(summary = "Új aktív terv létrehozása a megadott időtartamra")
-    @PostMapping
+    @Operation(summary = "Új aktív terv létrehozása a megadott +1 évre")
+    @GetMapping("/create/{greenhouseCode}")
     public Plan createPlan(
-            @PathVariable("greenhouseId") String greenhouseId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
+            @PathVariable("greenhouseCode") String greenhouseCode
     ) {
-        return planService.createEmptyActivePlan(greenhouseId, from, to);
+        return planService.createEmptyActivePlan(greenhouseCode);
     }
 }

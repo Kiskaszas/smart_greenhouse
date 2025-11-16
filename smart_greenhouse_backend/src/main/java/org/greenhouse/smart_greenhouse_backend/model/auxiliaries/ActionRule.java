@@ -1,7 +1,5 @@
 package org.greenhouse.smart_greenhouse_backend.model.auxiliaries;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.Type;
 
 /**

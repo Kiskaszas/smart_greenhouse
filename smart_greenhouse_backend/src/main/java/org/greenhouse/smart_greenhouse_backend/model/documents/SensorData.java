@@ -1,6 +1,9 @@
 package org.greenhouse.smart_greenhouse_backend.model.documents;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -15,7 +18,7 @@ public class SensorData {
     @Id
     private String id;
 
-    private String sensorCode;
+    private String code;
     private Instant timestamp;
     private Double temperature;  // hűréskéklet-°C
     private Double humidity;     // nedvesség-%
