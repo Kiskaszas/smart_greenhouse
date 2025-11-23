@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
 import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseIsExistByCodeException;
-import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundException;
+import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundForGreenhouseException;
+import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundxception;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.PlannedEvent;
-import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.Range;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.Type;
 import org.greenhouse.smart_greenhouse_backend.model.documents.*;
@@ -42,20 +42,8 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     public Greenhouse create(final Greenhouse greenhouse) {
         if(!greenhouseRepository.existsByCode(greenhouse.getCode())) {
             if (greenhouse.getPlantType() != null) {
-                // repository metódus legyen Optional<PlantProfile>
                 PlantProfile profile = plantProfileRepository.findByPlantType(greenhouse.getPlantType())
-                        .orElseGet(() -> {
-                            PlantProfile newProfile = new PlantProfile();
-                            newProfile.setPlantType(greenhouse.getPlantType());
-                            newProfile.setPlantCode(greenhouse.getPlantType());
-                            newProfile.setHumidityRangePct(new Range(40.0, 60.0));
-                            newProfile.setTemperatureRange(new Range(20.0, 30.0));
-                            newProfile.setSoilMoistureRangePct(new Range(30.0, 50.0));
-                            newProfile.setRules(List.of());
-                            return plantProfileRepository.save(newProfile);
-                        });
-                
-                // itt tényleg az ID-t kell beállítani, nem a type-ot
+                        .orElseThrow(() -> new PlanNotFoundxception(greenhouse.getPlantType()));
                 greenhouse.setPlantProfileId(profile.getId());
             }
 
@@ -172,7 +160,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
 
     @Override
     public WeatherDto fetchWeatherForGreenhouse(final String code) {
-         Greenhouse greenhouse = getByCode(code);
+        Greenhouse greenhouse = getByCode(code);
         WeatherDto dto = weatherService.fetchForLocation(
                 greenhouse.getLocation().city(),
                 greenhouse.getLocation().lat(),
@@ -241,7 +229,6 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         for (Greenhouse greenhouse : greenhouses) {
             if (greenhouse.getPlantProfileId() == null) {
                 log.warn("Greenhouse {} nem rendelkezik plantProfileId-vel", greenhouse.getId());
-                continue;
             }
         }
 
@@ -351,7 +338,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         return planRepository.findByGreenhouseCode(greenhouse.getCode()).stream()
                 .filter(Plan::isActive)
                 .reduce((first, second) -> second)
-                .orElseThrow(() -> new PlanNotFoundException(greenhouse.getCode()));
+                .orElseThrow(() -> new PlanNotFoundForGreenhouseException(greenhouse.getCode()));
     }
 
     @Override

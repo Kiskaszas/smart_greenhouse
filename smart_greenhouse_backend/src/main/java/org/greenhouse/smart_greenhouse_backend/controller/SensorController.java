@@ -24,8 +24,8 @@ public class SensorController {
         sensorService.updateByCode(sensorCode, sensor);
     }
 
-    @GetMapping("/latest")
-    public Optional<SensorData> latest() {
-        return sensorService.latest();
+    @GetMapping("/latest/{sensorCode}")
+    public Optional<SensorData> latest(@PathVariable("sensorCode") String sensorCode) {
+        return sensorService.latest(sensorCode);
     }
 }

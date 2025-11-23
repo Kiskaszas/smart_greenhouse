@@ -1,6 +1,7 @@
 package org.greenhouse.smart_greenhouse_backend.service.plan;
 
 import lombok.RequiredArgsConstructor;
+import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundForGreenhouseException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.PlannedEvent;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -49,14 +51,35 @@ public class PlanServiceImpl implements PlanService {
     }
 
     @Override
-    public Plan createEmptyActivePlan(
+    public Plan createEmptyInActivePlan(
             final String greenhouseCode) {
         Plan plan = Plan.builder()
                 .greenhouseCode(greenhouseCode)
                 .validFrom(Instant.now())
                 .validTo(Instant.now().plus(365, ChronoUnit.DAYS))
-                .active(true)
+                .active(false)
                 .build();
         return planRepository.save(plan);
+    }
+
+    @Override
+    public Plan toActivatePlanForGeenhouse(final String greenhouseCode) {
+        Optional<Plan> plan = planRepository.findPlanByGreenhouseCodeAndActiveIsFalse(greenhouseCode);
+        if (plan.isPresent()) {
+            Plan existPlan = plan.get();
+            existPlan.setActive(true);
+            return planRepository.save(existPlan);
+        }else{
+            throw new PlanNotFoundForGreenhouseException(greenhouseCode);
+        }
+    }
+
+    @Override
+    public void deletePlanByGreenhouseCode(String greenhouseCode) {
+        List<Plan> existsPlan = planRepository.findByGreenhouseCode(greenhouseCode);
+        if (existsPlan.isEmpty()) {
+            throw new PlanNotFoundForGreenhouseException(greenhouseCode);
+        }
+        planRepository.deleteByGreenhouseCode(greenhouseCode);
     }
 }

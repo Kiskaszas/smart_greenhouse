@@ -10,7 +10,7 @@ import java.util.Optional;
 
 @Repository
 public interface SensorDataRepository extends MongoRepository<SensorData, String> {
-    List<SensorData> findByTimestampAfter(Instant after);
+    List<SensorData> findByCodeAndTimestampAfter(String sensorCode, Instant after);
 
     Optional<SensorData> findByCode(String sensorCode);
 }

@@ -3,6 +3,7 @@ package org.greenhouse.smart_greenhouse_backend.service.control;
 import lombok.RequiredArgsConstructor;
 import org.greenhouse.smart_greenhouse_backend.dto.ControlStateDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
+import org.greenhouse.smart_greenhouse_backend.exception.ControlNotFoudException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.ActionType;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.CommandType;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -50,7 +52,6 @@ public class ControlServiceImpl implements ControlService {
                     greenhouseCode,
                     CommandType.IRRIGATION,
                     ActionType.START,
-                    "Soil moisture low; safe weather",
                     irrigationMinDuration
             );
         }
@@ -63,7 +64,6 @@ public class ControlServiceImpl implements ControlService {
                     greenhouseCode,
                     CommandType.VENTILATION,
                     ActionType.START,
-                    "High temp/humidity",
                     null);
         }
     }
@@ -73,28 +73,25 @@ public class ControlServiceImpl implements ControlService {
             String greenhouseCode,
             CommandType commandType,
             ActionType action,
-            Integer durationMin,
-            String reason
+            Integer durationMin
     ) {
-        emitEvent(greenhouseCode, commandType, action, reason, durationMin);
+        emitEvent(greenhouseCode, commandType, action, durationMin);
     }
 
     private void emitEvent(
             final String greenhouseCode,
             final CommandType commandType,
             final ActionType action,
-            final String reason,
             final Integer durationMin
     ) {
         ControlEvent event = ControlEvent.builder()
                 .timestamp(Instant.now())
+                .greenhouseCode(greenhouseCode)
                 .commandType(commandType)
                 .action(action)
-                .reason(reason)
                 .durationMin(durationMin)
                 .build();
         controlEventRepository.save(event);
-        // Itt lehetne valós eszközvezérlés (GPIO, MQTT, HTTP) integráció
     }
 
     @Override
@@ -109,7 +106,35 @@ public class ControlServiceImpl implements ControlService {
     }
 
     @Override
-    public ControlStateDto getControlState() {
+    public ControlStateDto getControlStateByGreenhouseCode(String greenhouseCode) throws ControlNotFoudException {
+        List<ControlEvent> events = controlEventRepository.findByGreenhouseCodeOrderByTimestampDesc(greenhouseCode);
+        boolean irrigationActive = false;
+        boolean ventilationActive = false;
+
+        for (ControlEvent event : events) {
+            if (!irrigationActive && event.getCommandType() == CommandType.IRRIGATION) {
+                if (event.getAction() == ActionType.START) {
+                    if (event.getDurationMin() != null) {
+                        event.getTimestamp().plus(event.getDurationMin(), ChronoUnit.MINUTES);
+                    } else {
+                        irrigationActive = true;
+                    }
+                } else if (event.getAction() == ActionType.STOP) {
+                    irrigationActive = false;
+                }
+            }
+
+            if (!ventilationActive && event.getCommandType() == CommandType.VENTILATION) {
+                if (event.getAction() == ActionType.START) {
+                    ventilationActive = true;
+                } else if (event.getAction() == ActionType.STOP) {
+                    ventilationActive = false;
+                }
+            }
+
+            if (irrigationActive && ventilationActive) break;
+        }
+
         return ControlStateDto.builder()
                 .irrigationEnabled(irrigationEnabled)
                 .ventilationEnabled(ventilationEnabled)
@@ -123,7 +148,7 @@ public class ControlServiceImpl implements ControlService {
     }
 
     @Override
-    public List<ControlEvent> getAllEventsForGreenhouse(String greenhouseIgreenhouseCode) {
-        return controlEventRepository.findByGreenhouseCode(greenhouseIgreenhouseCode);
+    public List<ControlEvent> getAllEventsForGreenhouse(String greenhouseGreenhouseCode) {
+        return controlEventRepository.findByGreenhouseCodeOrderByTimestampDesc(greenhouseGreenhouseCode);
     }
 }

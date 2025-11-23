@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface ControlEventRepository extends MongoRepository<ControlEvent, String> {
 
-    List<ControlEvent> findByGreenhouseCode(String greenhouseId);
+    List<ControlEvent> findByGreenhouseCodeOrderByTimestampDesc(String greenhouseId);
 }

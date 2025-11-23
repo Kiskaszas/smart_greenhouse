@@ -13,9 +13,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import static org.hamcrest.core.IsInstanceOf.any;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SensorServiceImplTest {
@@ -48,20 +48,22 @@ class SensorServiceImplTest {
     void latest_shouldReturnMostRecentSensorData() {
         SensorData oldData = SensorData.builder()
                 .id("1")
+                .code("sensor1")
                 .timestamp(Instant.now().minusSeconds(100))
                 .temperature(20.0)
                 .build();
 
         SensorData newData = SensorData.builder()
                 .id("2")
+                .code("sensor1")
                 .timestamp(Instant.now())
                 .temperature(25.0)
                 .build();
 
-        when(repository.findByTimestampAfter(ArgumentMatchers.<Instant>any()))
+        when(repository.findByCodeAndTimestampAfter(oldData.getCode(), ArgumentMatchers.any()))
                 .thenReturn(List.of(oldData, newData));
 
-        Optional<SensorData> result = service.latest();
+        Optional<SensorData> result = service.latest(newData.getCode());
 
         assertTrue(result.isPresent());
         assertEquals("2", result.get().getId());

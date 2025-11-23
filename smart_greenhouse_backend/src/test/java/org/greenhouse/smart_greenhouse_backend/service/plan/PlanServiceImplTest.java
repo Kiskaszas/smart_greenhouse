@@ -70,7 +70,7 @@ class PlanServiceImplTest {
     }
 
     @Test
-    void createEmptyActivePlan_shouldSaveAndReturnPlan() {
+    void createEmptyInActivePlan_shouldSaveAndReturnPlan() {
         Instant from = Instant.now();
         Instant to = Instant.now().plus(365, ChronoUnit.DAYS);
 
@@ -84,7 +84,7 @@ class PlanServiceImplTest {
 
         when(planRepository.save(any(Plan.class))).thenReturn(plan);
 
-        Plan result = planService.createEmptyActivePlan("greenhouse3");
+        Plan result = planService.createEmptyInActivePlan("greenhouse3");
 
         assertEquals("planX", result.getId());
         assertEquals("greenhouse3", result.getGreenhouseCode());

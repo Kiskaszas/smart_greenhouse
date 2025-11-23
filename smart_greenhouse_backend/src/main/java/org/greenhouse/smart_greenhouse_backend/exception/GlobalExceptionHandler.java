@@ -11,8 +11,8 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(PlanNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handlePlanNotFound(PlanNotFoundException ex) {
+    @ExceptionHandler(PlanNotFoundForGreenhouseException.class)
+    public ResponseEntity<Map<String, String>> handlePlanNotFound(PlanNotFoundForGreenhouseException ex) {
         Map<String, String> body = new HashMap<>();
         body.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);

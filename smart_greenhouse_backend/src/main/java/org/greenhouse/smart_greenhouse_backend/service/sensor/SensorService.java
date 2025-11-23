@@ -15,19 +15,19 @@ public interface SensorService {
     SensorData ingest(SensorData data);
 
     /**
-     * Lekéri a legutolsó beérkezett szenzoradatot.
+     * Lekéri a legutolsó beérkezett szenzoradatot a szenzorra.
      *
      * @return {@link Optional} a legfrissebb {@link SensorData} példánnyal,
      *         vagy üres, ha még nem érkezett adat
      */
-    Optional<SensorData> latest();
+    Optional<SensorData> latest(final String sensorCode);
 
     /**
      * A szenzoron hajt végre módosítást az Id alapján.
      *
-     * @param sensorCode
-     * @param sensor
-     * @return
+     * @param sensorCode A szenzor egyedi azonosító kódja.
+     * @param sensor A szenzor objektum.
+     * @return void
      */
     void updateByCode(String sensorCode, SensorData sensor);
 }

@@ -11,10 +11,25 @@ public interface PlanService {
     Plan getOrCreateActivePlan(final Greenhouse greenhouse);
 
     /**
-     * Egy üres terv elkészítési az üvegházhoz.
+     * Egy üres inaktív terv elkészítés az üvegházhoz.
      *
-     * @param greenhouseCode
-     * @return
+     * @param greenhouseCode az üvegház azonosítója.
+     * @return egy plan objektum.
      */
-    Plan createEmptyActivePlan(final String greenhouseCode);
+    Plan createEmptyInActivePlan(final String greenhouseCode);
+
+    /**
+     * Egy terv státusztának aktivvá állítása az adott üvegházhoz.
+     *
+     * @param greenhouseCode az üvegház azonosítója.
+     * @return egy plan objektum.
+     */
+    Plan toActivatePlanForGeenhouse(final String greenhouseCode);
+
+    /**
+     * Egy terv törlése az üvegházhoz.
+     *
+     * @param greenhouseCode az üvegház azonosítója.
+     */
+    void deletePlanByGreenhouseCode(final String greenhouseCode);
 }

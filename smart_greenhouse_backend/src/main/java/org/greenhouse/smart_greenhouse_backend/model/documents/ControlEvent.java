@@ -21,6 +21,5 @@ public class ControlEvent {
     private String greenhouseCode; // Üvegház azonosító kódja
     private CommandType commandType;         // IRRIGATION, VENTILATION, stb.
     private ActionType action;       // START, STOP, OPEN, CLOSE
-    private String reason;       // miért történt (pl. "Manual command", "Rule engine")
     private Integer durationMin; // ha időzített akció, mennyi ideig tart
 }

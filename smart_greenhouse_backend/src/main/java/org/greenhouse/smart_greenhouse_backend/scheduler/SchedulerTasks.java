@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.greenhouse.smart_greenhouse_backend.service.greenhouse.GreenhouseService;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -31,7 +32,7 @@ public class SchedulerTasks {
      * akció (pl. öntözés bekapcsolása, szellőző nyitása) végrehajtásra kerül,
      * és bekerül az akciónaplóba.
      */
-    //@Scheduled(fixedRate = 300000) // 5 perc
+    @Scheduled(fixedRate = 300000) // 5 perc
     public void checkSensors() {
         service.evaluateRulesFromSensors();
     }

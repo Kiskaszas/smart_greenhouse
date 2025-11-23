@@ -21,8 +21,8 @@ public class SensorServiceImpl implements SensorService {
     }
 
     @Override
-    public Optional<SensorData> latest() {
-        return sensorDataRepository.findByTimestampAfter(Instant.now().minusSeconds(7 * 24 * 3600))
+    public Optional<SensorData> latest(final String sensorCode) {
+        return sensorDataRepository.findByCodeAndTimestampAfter(sensorCode, Instant.now().minusSeconds(7 * 24 * 3600))
                 .stream().sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
                 .findFirst();
     }

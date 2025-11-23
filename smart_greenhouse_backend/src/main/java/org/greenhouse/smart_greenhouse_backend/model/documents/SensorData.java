@@ -18,6 +18,7 @@ public class SensorData {
     @Id
     private String id;
 
+    private String greenhouseCode;
     private String code;
     private Instant timestamp;
     private Double temperature;  // hűréskéklet-°C

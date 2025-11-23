@@ -2,6 +2,7 @@ package org.greenhouse.smart_greenhouse_backend.service.control;
 
 import org.greenhouse.smart_greenhouse_backend.dto.ControlStateDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
+import org.greenhouse.smart_greenhouse_backend.exception.ControlNotFoudException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.ActionType;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.CommandType;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
@@ -20,8 +21,7 @@ public interface ControlService {
             final String greehouseCode,
             final CommandType type,
             final ActionType action,
-            final Integer durationMin,
-            final String reason
+            final Integer durationMin
     );
 
     /**
@@ -35,14 +35,14 @@ public interface ControlService {
     ControlEvent getEventById(String id);
 
     /**
-     * Aktuális vezérlési konfiguráció visszaadása DTO-ban.
+     * Aktuális vezérlési konfiguráció visszaadása DTO-ban a greenahouse kódja által.
      */
-    ControlStateDto getControlState();
+    ControlStateDto getControlStateByGreenhouseCode(final String greenhouseCode) throws ControlNotFoudException;
 
     /**
      * Összes vezérlési esemény lekérdezése az adott green housera a dedikált kódja alapján.
      *
-     * @param greenhouseCode
+     * @param greenhouseCode az üvegház azonosítója.
      */
     List<ControlEvent> getAllEventsForGreenhouse(String greenhouseCode);
 }
