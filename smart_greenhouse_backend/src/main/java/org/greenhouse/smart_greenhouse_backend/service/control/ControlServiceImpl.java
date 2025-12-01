@@ -3,7 +3,6 @@ package org.greenhouse.smart_greenhouse_backend.service.control;
 import lombok.RequiredArgsConstructor;
 import org.greenhouse.smart_greenhouse_backend.dto.ControlStateDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
-import org.greenhouse.smart_greenhouse_backend.exception.ControlNotFoudException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.ActionType;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.CommandType;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ControlEvent;
@@ -106,16 +105,23 @@ public class ControlServiceImpl implements ControlService {
     }
 
     @Override
-    public ControlStateDto getControlStateByGreenhouseCode(String greenhouseCode) throws ControlNotFoudException {
-        List<ControlEvent> events = controlEventRepository.findByGreenhouseCodeOrderByTimestampDesc(greenhouseCode);
+    public ControlStateDto getControlStateByGreenhouseCode(String greenhouseCode) {
+        List<ControlEvent> events = controlEventRepository
+                .findByGreenhouseCodeOrderByTimestampDesc(greenhouseCode);
+
         boolean irrigationActive = false;
         boolean ventilationActive = false;
+        Instant now = Instant.now();
 
         for (ControlEvent event : events) {
-            if (!irrigationActive && event.getCommandType() == CommandType.IRRIGATION) {
+            if (event.getCommandType() == CommandType.IRRIGATION) {
                 if (event.getAction() == ActionType.START) {
                     if (event.getDurationMin() != null) {
-                        event.getTimestamp().plus(event.getDurationMin(), ChronoUnit.MINUTES);
+                        Instant end = event.getTimestamp()
+                                .plus(event.getDurationMin(), ChronoUnit.MINUTES);
+                        if (now.isBefore(end)) {
+                            irrigationActive = true;
+                        }
                     } else {
                         irrigationActive = true;
                     }
@@ -124,7 +130,7 @@ public class ControlServiceImpl implements ControlService {
                 }
             }
 
-            if (!ventilationActive && event.getCommandType() == CommandType.VENTILATION) {
+            if (event.getCommandType() == CommandType.VENTILATION) {
                 if (event.getAction() == ActionType.START) {
                     ventilationActive = true;
                 } else if (event.getAction() == ActionType.STOP) {
@@ -132,7 +138,9 @@ public class ControlServiceImpl implements ControlService {
                 }
             }
 
-            if (irrigationActive && ventilationActive) break;
+            if (irrigationActive && ventilationActive) {
+                break;
+            }
         }
 
         return ControlStateDto.builder()

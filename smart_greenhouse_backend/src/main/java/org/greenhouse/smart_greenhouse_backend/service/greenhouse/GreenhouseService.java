@@ -152,4 +152,6 @@ public interface GreenhouseService {
      */
     void pollAllGreenhouses();
 
+    Greenhouse createDemoGreenhouseIfNotExists();
+
 }

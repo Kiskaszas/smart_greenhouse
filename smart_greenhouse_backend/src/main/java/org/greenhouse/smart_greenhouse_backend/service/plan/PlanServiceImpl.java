@@ -25,7 +25,7 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     public Plan getOrCreateActivePlan(Greenhouse greenhouse) {
-        return planRepository.findFirstByGreenhouseCodeAndActiveTrue(greenhouse.getId())
+        return planRepository.findFirstByGreenhouseCodeAndActiveTrue(greenhouse.getCode())
                 .orElseGet(() -> seedDefaultPlan(greenhouse));
     }
 
@@ -40,7 +40,7 @@ public class PlanServiceImpl implements PlanService {
                 .build();
 
         Plan plan = Plan.builder()
-                .greenhouseCode(gh.getId())
+                .greenhouseCode(gh.getCode())
                 .validFrom(now)
                 .validTo(now.plus(3, ChronoUnit.DAYS))
                 .active(true)

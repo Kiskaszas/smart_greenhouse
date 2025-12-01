@@ -23,8 +23,13 @@ public class PlantProfileLoader {
     @EventListener(ApplicationReadyEvent.class)
     public void loadProfiles() throws IOException {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+
         for (Resource res : resolver.getResources("classpath:plant-profiles/*.yml")) {
             PlantProfile profile = yamlMapper.readValue(res.getInputStream(), PlantProfile.class);
+
+            repo.findByPlantCode(profile.getPlantCode())
+                    .ifPresent(existing -> profile.setId(existing.getId()));
+
             repo.save(profile);
         }
     }

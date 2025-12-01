@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   mongodb:
     image: mongo:6.0
@@ -12,22 +13,15 @@ services:
       - mongo_data:/data/db
 
   backend:
-    build: ./backend   # itt a Spring Boot Dockerfile helye
-    container_name: backend
+    build: ./smart_greenhouse_backend
+    container_name: smart_greenhouse_backend
     ports:
       - "8080:8080"
     depends_on:
       - mongodb
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://root:example@mongodb:27017
-
-  frontend:
-    build: ./frontend  # itt a React/Next.js Dockerfile helye
-    container_name: frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
+      SPRING_DATA_MONGODB_URI: mongodb://root:example@mongodb:27017/greenhouse?authSource=admin
+      SERVER_SSL_ENABLED: "false"
 
 volumes:
   mongo_data:

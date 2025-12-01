@@ -5,6 +5,7 @@ import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.Location;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ public class Greenhouse {
     @Id
     private String id;
 
+    @Indexed(unique = true)
     private String code;
     private String name;
     private String plantType;

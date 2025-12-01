@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8" />
+    <title>Smart Greenhouse</title>
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<header class="app-header">
+    <h1>Smart Greenhouse</h1>
+    <p>Időjárásvezérelt öntözés és szellőztetés – demó felület</p>
+</header>
+
+<main class="layout">
+
+    <section class="card">
+        <div class="card-header">
+            <h2>Üvegházak</h2>
+            <div class="card-header-actions">
+                <button id="create-greenhouse-toggle" class="btn-secondary">
+                    Új üvegház
+                </button>
+                <button id="create-demo-btn" class="btn-primary">
+                    Demo üvegház
+                </button>
+            </div>
+        </div>
+
+        <!-- Új üvegház felvétele űrlap -->
+        <form id="create-greenhouse-form" class="card-body form-compact hidden">
+            <div class="form-row">
+                <label for="gh-code">Kód*</label>
+                <input type="text" id="gh-code" name="code" required placeholder="pl. GREEN_1ST">
+            </div>
+
+            <div class="form-row">
+                <label for="gh-name">Név</label>
+                <input type="text" id="gh-name" name="name" placeholder="pl. Üvegház #1">
+            </div>
+
+            <div class="form-row">
+                <label for="gh-plant-type">Növény típusa*</label>
+                <select id="gh-plant-type" name="plantType" required>
+                    <option value="">Válassz típust…</option>
+                    <option value="TOMATO">Paradicsom (TOMATO)</option>
+                    <option value="PEPPER">Paprika (PEPPER)</option>
+                    <option value="JALAPENO">Jalapeno (JALAPENO)</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label for="gh-city">Város</label>
+                <input type="text" id="gh-city" name="city" placeholder="pl. Budapest">
+            </div>
+
+            <div class="form-row">
+                <label for="gh-lat">Szélesség (lat)</label>
+                <input type="number" step="0.0001" id="gh-lat" name="lat" placeholder="pl. 47.4979">
+            </div>
+
+            <div class="form-row">
+                <label for="gh-lon">Hosszúság (lon)</label>
+                <input type="number" step="0.0001" id="gh-lon" name="lon" placeholder="pl. 19.0402">
+            </div>
+
+            <button type="submit" class="btn-primary btn-full">
+                Üvegház létrehozása
+            </button>
+        </form>
+
+        <div id="greenhouse-list" class="card-body empty-state">
+            Még nincs üvegház az adatbázisban.
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 id="details-title">Válassz egy üvegházat a listából…</h2>
+
+        <div id="greenhouse-details" class="card-body"></div>
+
+        <div id="greenhouse-controls" class="control-panel">
+            <h3>Manuális vezérlés</h3>
+
+            <button id="btn-irrigation-on" class="btn-control">
+                Öntözés bekapcsolása
+            </button>
+            <button id="btn-irrigation-off" class="btn-control">
+                Öntözés kikapcsolása
+            </button>
+
+            <button id="btn-ventilation-toggle" class="btn-control">
+                Szellőztetés váltása
+            </button>
+
+            <button id="btn-refresh" class="btn-secondary btn-full">
+                Adatok frissítése
+            </button>
+
+            <button id="btn-delete" class="btn-danger btn-full">
+                Üvegház törlése
+            </button>
+        </div>
+    </section>
+</main>
+
+<div id="notification-container" class="notification-container"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

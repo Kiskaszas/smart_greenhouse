@@ -3,10 +3,12 @@ package org.greenhouse.smart_greenhouse_backend.service.greenhouse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
-import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseIsExistByCodeException;
+import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseAlreadyExistsException;
+import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseNotFoundException;
 import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundForGreenhouseException;
-import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundxception;
+import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.Location;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.PlannedEvent;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.Type;
@@ -43,7 +45,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         if(!greenhouseRepository.existsByCode(greenhouse.getCode())) {
             if (greenhouse.getPlantType() != null) {
                 PlantProfile profile = plantProfileRepository.findByPlantType(greenhouse.getPlantType())
-                        .orElseThrow(() -> new PlanNotFoundxception(greenhouse.getPlantType()));
+                        .orElseThrow(() -> new PlanNotFoundException(greenhouse.getPlantType()));
                 greenhouse.setPlantProfileId(profile.getId());
             }
 
@@ -59,7 +61,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             }
             return saved;
         }
-        throw new GreenhouseIsExistByCodeException("Az üvegház már lérezik ezzel a kóddal");
+        throw new GreenhouseAlreadyExistsException("Az üvegház már lérezik ezzel a kóddal");
     }
 
     @Override
@@ -70,7 +72,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     @Override
     public Greenhouse getByCode(final String code) {
         return greenhouseRepository.findByCode(code)
-                .orElseThrow(() -> new GreenhouseIsExistByCodeException("Greenhouse not found: " + code));
+                .orElseThrow(() -> new GreenhouseNotFoundException("Greenhouse not found: " + code));
     }
 
     @Override
@@ -90,11 +92,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     @Override
     public void deleteByCode(final String code) {
         Greenhouse greenhouse = getByCode(code);
-        if(greenhouse != null) {
-            greenhouseRepository.deleteById(greenhouse.getId());
-        }else {
-            throw new RuntimeException("Greenhouse not found: " + code);
-        }
+        greenhouseRepository.deleteById(greenhouse.getId());
     }
 
     @Override
@@ -326,7 +324,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         plan.setEvents(events);
         planRepository.save(plan);
 
-        greenhouse.setPlanId(plan.getGreenhouseCode());
+        greenhouse.setPlanId(plan.getId());
         greenhouseRepository.save(greenhouse);
         log.info("Új greenhouse-hoz alap plan létrehozva: {}", plan.getId());
     }
@@ -361,7 +359,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             if (weather == null) continue;
 
             WeatherSnapshot snapshot = WeatherSnapshot.builder()
-                    .greenhouseCode(greenhouse.getId())
+                    .greenhouseCode(greenhouse.getCode())
                     .timestamp(Instant.now())
                     .temperature(weather.getTemperature())
                     .humidity(weather.getHumidity())
@@ -397,5 +395,22 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             actionLogRepository.save(logEntry);
         }
         greenhouseRepository.save(greenhouse);
+    }
+
+    @Override
+    public Greenhouse createDemoGreenhouseIfNotExists() {
+        if (greenhouseRepository.count() > 0) {
+            return greenhouseRepository.findAll().get(0);
+        }
+
+        Location demoLocation = new Location("Kecskemét", 46.8963711, 19.68996861);
+        Greenhouse demo = new Greenhouse();
+        demo.setCode("DEMO-1");
+        demo.setName("Demo üvegház");
+        demo.setLocation(demoLocation);
+        demo.setPlantProfileId(null);
+        demo.setPlanId(null);
+
+        return greenhouseRepository.save(demo);
     }
 }

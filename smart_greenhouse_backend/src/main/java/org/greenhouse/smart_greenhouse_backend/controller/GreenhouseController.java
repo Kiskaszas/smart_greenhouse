@@ -33,6 +33,14 @@ public class GreenhouseController {
         return service.create(greenhouse);
     }
 
+    @Operation(summary = "Demo üvegház létrehozása, ha még nincs")
+    @ApiResponse(responseCode = "200", description = "Demo üvegház létrehozva vagy már létezett")
+    @PostMapping("/demo")
+    public ResponseEntity<Greenhouse> createDemoGreenhouse() {
+        Greenhouse demo = service.createDemoGreenhouseIfNotExists();
+        return ResponseEntity.ok(demo);
+    }
+
     @Operation(summary = "Üvegházak listázása")
     @ApiResponse(responseCode = "200", description = "Sikeres lekérés")
     @GetMapping
@@ -42,6 +50,7 @@ public class GreenhouseController {
 
     @Operation(summary = "Üvegház lekérése ID-CODE alapján")
     @ApiResponse(responseCode = "200", description = "Sikeres lekérés")
+    @ApiResponse(responseCode = "400", description = "Az üvegház már létezik ezzel a kóddal")
     @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel a kóddal")
     @GetMapping("/{code}")
     public Greenhouse get(@PathVariable("code") String code) {
