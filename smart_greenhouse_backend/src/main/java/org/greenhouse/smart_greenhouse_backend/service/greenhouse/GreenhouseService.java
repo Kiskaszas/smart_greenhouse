@@ -1,11 +1,11 @@
 package org.greenhouse.smart_greenhouse_backend.service.greenhouse;
 
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
-import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ActionLog;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
+import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
 
 import java.util.List;
 
@@ -154,4 +154,7 @@ public interface GreenhouseService {
 
     Greenhouse createDemoGreenhouseIfNotExists();
 
+    Greenhouse simulateNow(final String code);
+
+    Greenhouse setActive(final String code, final boolean active);
 }

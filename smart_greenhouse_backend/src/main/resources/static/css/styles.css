@@ -347,3 +347,460 @@ body {
     0%   { background-color: #fff9c4; }
     100% { background-color: transparent; }
 }
+
+/* Layout */
+.layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    padding: 24px;
+}
+
+/* Card alap */
+.card {
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.card-header,
+.card-footer {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-footer {
+    border-top: 1px solid #e5e7eb;
+    border-bottom: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+}
+
+.card-body {
+    padding: 16px 20px 20px;
+}
+
+/* Gombok */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+    border: none;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+}
+
+.btn-primary {
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+}
+
+.btn-secondary {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.btn-secondary:hover {
+    background: #dbeafe;
+}
+
+.btn-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.btn-danger:hover {
+    background: #fecaca;
+}
+
+/* Lista elemek */
+.greenhouse-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    margin-bottom: 6px;
+    transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease;
+}
+
+.greenhouse-item:hover {
+    background: #eff6ff;
+    transform: translateY(-1px);
+}
+
+.greenhouse-item.active {
+    background: #dbeafe;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.greenhouse-name {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.greenhouse-code {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Státusz pill a részletek fejlécében */
+.status-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-pill--active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-pill--inactive {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.stat-card {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-bottom: 3px;
+}
+
+.stat-value {
+    font-weight: 600;
+}
+
+.manual-control h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.toggle-row:last-child {
+    border-bottom: none;
+}
+
+.manual-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #d1d5db;
+    transition: .2s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .2s;
+}
+
+input:checked + .slider {
+    background-color: #22c55e;
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+.slider.round {
+    border-radius: 999px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* Rejtett állapot */
+.hidden {
+    display: none;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(3px);
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 24px;
+    width: 420px;
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.card-subsection {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.manual-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+/* klasszikus iOS-szerű toggle; ha már van switch/slider, ez ráerősít */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #e5e7eb;
+    transition: .2s;
+    border-radius: 999px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 999px;
+}
+
+input:checked + .slider {
+    background-color: #4ade80; /* zöld */
+}
+
+input:checked + .slider:before {
+    transform: translateX(18px);
+}
+
+.slider.round {
+    border-radius: 999px;
+}
+.slider.round:before {
+    border-radius: 999px;
+}
+
+.manual-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+#sensor-section {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+#sensor-section .card-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+#sensor-section h3 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.sensor-list {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    overflow-x: auto;
+}
+
+.sensor-list.empty-state {
+    background: transparent;
+    padding: 4px 0;
+    color: #9ca3af;
+}
+
+.sensor-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.sensor-table thead {
+    background: #eff6ff;
+}
+
+.sensor-table th,
+.sensor-table td {
+    padding: 6px 8px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.sensor-table th {
+    font-weight: 600;
+    color: #4b5563;
+    font-size: 0.8rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.sensor-table tbody tr:nth-child(even) {
+    background: #f3f4f6;
+}
+
+.sensor-table tbody tr:hover {
+    background: #e5ebff;
+}
+
+.sensor-form {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f9fafb;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sensor-form .form-row {
+    margin-bottom: 4px;
+}
+
+.sensor-form .form-row label {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.sensor-form .form-row input,
+.sensor-form .form-row select {
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 0.85rem;
+    background: #ffffff;
+}
+
+.sensor-form .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.btn-small {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+}

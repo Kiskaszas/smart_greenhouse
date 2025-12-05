@@ -16,7 +16,6 @@ public class GreenhouseScheduler {
     private final GreenhouseService greenhouseService;
 
     @Scheduled(cron = "0 0/30 * * * *") // 30 percenként
-    @Scheduled(fixedRate = 120000)
     public void pollAllGreenhouses() {
         greenhouseService.pollAllGreenhouses();
     }

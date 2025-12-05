@@ -14,6 +14,6 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Smart Greenhouse API")
                         .version("1.0")
-                        .description("Időjárásvezérelt üvegreenhouseáz vezérlő rendszer REST API dokumentáció"));
+                        .description("Időjárásvezérelt üvegház vezérlő rendszer REST API dokumentáció"));
     }
 }

@@ -5,25 +5,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
 import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseAlreadyExistsException;
 import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseNotFoundException;
-import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundForGreenhouseException;
 import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundException;
+import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundForGreenhouseException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.Location;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.PlannedEvent;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.Type;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.enums.Unit;
 import org.greenhouse.smart_greenhouse_backend.model.documents.*;
 import org.greenhouse.smart_greenhouse_backend.repository.*;
 import org.greenhouse.smart_greenhouse_backend.service.rule_evaluator.RuleEvaluatorService;
 import org.greenhouse.smart_greenhouse_backend.service.weather.WeatherService;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -96,6 +95,13 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     }
 
     @Override
+    public Greenhouse setActive(String code, boolean active) {
+        Greenhouse greenhouse = getByCode(code);
+        greenhouse.setActive(active);
+        return greenhouseRepository.save(greenhouse);
+    }
+
+    @Override
     public Greenhouse addSensorData(final String code, final SensorRef sensor) {
         Greenhouse greenhouse = getByCode(code);
 
@@ -111,7 +117,8 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 : sensor;
 
         greenhouse.getSensors().removeIf(sensorRef ->
-                sensorRef.id().equals(sensor.id()) || sensorRef.code().equals(sensor.code())
+                Objects.equals(sensorRef.id(), sensor.id())
+                        && Objects.equals(sensorRef.code(), sensor.code())
         );
 
         greenhouse.getSensors().add(sensorWithTimestamp);
@@ -358,14 +365,22 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             WeatherDto weather = fetchWeatherForGreenhouse(greenhouse.getCode());
             if (weather == null) continue;
 
+            // 1) Külső időjárás snapshot (ahogy eddig is csináltad)
             WeatherSnapshot snapshot = WeatherSnapshot.builder()
                     .greenhouseCode(greenhouse.getCode())
                     .timestamp(Instant.now())
+                    .city(weather.getCity())
                     .temperature(weather.getTemperature())
                     .humidity(weather.getHumidity())
                     .windSpeed(weather.getWindSpeed())
                     .precipitationMm(weather.getPrecipitationMm())
+                    // ha van soilMoistureExtPct a WeatherDto-ban:
+                    //.soilMoistureExtPct(weather.getSoilMoistureExtPct())
                     .build();
+            weatherSnapshotRepository.save(snapshot);
+
+            // 2) BELSŐ KÖRNYEZET SZIMULÁCIÓ
+            simulateInternalEnvironment(greenhouse, weather);
 
             log.info("Actual weatherSnapshot: {}", snapshot);
             weatherSnapshotRepository.save(snapshot);
@@ -412,5 +427,207 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         demo.setPlanId(null);
 
         return greenhouseRepository.save(demo);
+    }
+
+    @Override
+    public Greenhouse simulateNow(final String code) {
+        Greenhouse greenhouse = getByCode(code);
+
+        Location location = greenhouse.getLocation();
+        if (location == null) {
+            return greenhouse;
+        }
+
+        WeatherDto weather = weatherService.fetchForLocation(
+                location.city(),
+                location.lat(),
+                location.lon()
+        ).block();
+
+        if (weather == null) {
+            return greenhouse;
+        }
+
+        simulateInternalEnvironment(greenhouse, weather);
+
+        return greenhouseRepository.save(greenhouse);
+    }
+
+    /**
+     * Belső (virtuális) szenzor upsert egy üvegházhoz.
+     * Ha létezik a given code, töröljük és új SensorRef-et teszünk be friss értékkel.
+     */
+    private void upsertInternalSensor(Greenhouse greenhouse,
+                                      String sensorCode,
+                                      Type type,
+                                      Unit unit,
+                                      double value) {
+        var sensors = greenhouse.getSensors();
+        if (sensors == null) {
+            sensors = new ArrayList<>();
+            greenhouse.setSensors(sensors);
+        }
+
+        sensors.removeIf(sr -> Objects.equals(sr.code(), sensorCode));
+
+        SensorRef updated = new SensorRef(
+                sensorCode,
+                sensorCode,
+                type,
+                unit,
+                value,
+                Instant.now()
+        );
+        sensors.add(updated);
+    }
+
+    //Mini units
+    private double clamp(double v, double min, double max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
+    private double linearInterpolation(double current, double target, double alpha) {
+        return current + (target - current) * alpha;
+    }
+
+    private double readInternalSensorOrDefault(Greenhouse greenhouse,
+                                               String sensorCode,
+                                               Type type,
+                                               double defaultValue) {
+        return greenhouse.getSensors().stream()
+                .filter(s -> s.type() == type && sensorCode.equals(s.code()))
+                .map(SensorRef::lastValue)
+                .findFirst()
+                .orElse(defaultValue);
+    }
+
+    private double computeInitialSoilMoisture(double extTemp, double extHumidity) {
+        // nagyon egyszerű modell: a páratartalom dominál, a meleg kicsit szárít
+        double base = extHumidity * 0.7 - Math.max(0, extTemp - 15) * 1.5;
+        // 10–90% közé szorítjuk
+        return Math.max(10.0, Math.min(90.0, base));
+    }
+
+    // #############---- SIMULATION ---######################
+    private void simulateInternalEnvironment(Greenhouse greenhouse, WeatherDto weather) {
+        DeviceState devices = greenhouse.getDevices();
+        List<SensorRef> sensors = greenhouse.getSensors();
+        Instant now = Instant.now();
+
+        // Külső időjárás – fallback alapértékekkel
+        double extTemp = weather.getTemperature() != null ? weather.getTemperature() : 20.0;
+        double extHumidity = weather.getHumidity() != null ? weather.getHumidity() : 60.0;
+
+        // ---------- BELSŐ HŐMÉRSÉKLET ----------
+        double intTemp = extTemp;
+        if (devices.isLightOn()) {
+            intTemp += 1.5;
+        }
+        if (devices.isVentOpen()) {
+            intTemp -= 1.0;
+        }
+        if (devices.isShadeOn()) {
+            intTemp -= 0.5;
+        }
+
+        // ---------- BELSŐ PÁRATARTALOM ----------
+        double intHumidity = extHumidity;
+        if (devices.isHumidifierOn()) {
+            intHumidity += 5.0;
+        }
+        if (devices.isVentOpen()) {
+            intHumidity -= 3.0;
+        }
+
+        // ---------- TALAJNEDVESSÉG (belső) ----------
+        double soilMoist;
+        Optional<SensorRef> existingSoil = sensors.stream()
+                .filter(s -> "SOIL_MOIST".equals(s.code()))
+                .findFirst();
+
+        if (existingSoil.isPresent()) {
+            // már van korábbi érték → abból indulunk ki
+            soilMoist = existingSoil.get().lastValue();
+        } else {
+            // első érték: külső adatokból becsülve
+            soilMoist = computeInitialSoilMoisture(extTemp, extHumidity);
+        }
+
+        // öntözés / kiszáradás hatása
+        if (devices.isIrrigationOn()) {
+            soilMoist = Math.min(100.0, soilMoist + 3.0);
+        } else {
+            soilMoist = Math.max(0.0, soilMoist - extTemp / 50.0);
+        }
+
+        boolean autoIrrigationOff = false;
+
+        if (soilMoist >= 100.0 && devices.isIrrigationOn()) {
+            soilMoist = 100.0;
+            devices.setIrrigationOn(false);
+            autoIrrigationOff = true;
+        }
+
+        if (autoIrrigationOff) {
+            log.info("Irrigation auto-OFF in greenhouse {}: soil moisture reached 100%", greenhouse.getCode());
+        }
+
+        // ---------- SZENZOROK FRISSÍTÉSE ----------
+        upsertSensor(sensors, "INT_TEMP", Type.TEMPERATURE, Unit.CELSIUS, intTemp, now);
+        upsertSensor(sensors, "INT_HUMIDITY", Type.HUMIDITY_PCT, Unit.PERCENT, intHumidity, now);
+        upsertSensor(sensors, "SOIL_MOIST", Type.SOILMOISTURE_PTC, Unit.PERCENT, soilMoist, now);
+    }
+
+    private void upsertSensor(List<SensorRef> sensors,
+                              String code,
+                              Type type,
+                              Unit unit,
+                              Double value,
+                              Instant now) {
+
+        String id = code;
+
+        for (SensorRef s : sensors) {
+            if (code.equals(s.code())) {
+                id = s.id(); // ha már van ilyen kódú szenzor, az eredeti id-t megtartjuk
+                break;
+            }
+        }
+
+        SensorRef updated = new SensorRef(
+                id,
+                code,
+                type,
+                unit,
+                value,
+                now
+        );
+
+        sensors.removeIf(s -> code.equals(s.code()));
+        sensors.add(updated);
+    }
+
+    @Scheduled(fixedRateString = "${greenhouse.simulation-interval-ms:5000}")
+    public void scheduledSimulation() {
+        List<Greenhouse> all = greenhouseRepository.findAll();
+
+        for (Greenhouse greenhouse : all) {
+            if (!greenhouse.isActive() || greenhouse.getLocation() == null) {
+                continue;
+            }
+
+            WeatherDto weather = weatherService.fetchForLocation(
+                    greenhouse.getLocation().city(),
+                    greenhouse.getLocation().lat(),
+                    greenhouse.getLocation().lon()
+            ).block();
+
+            if (weather == null) {
+                continue;
+            }
+
+            simulateInternalEnvironment(greenhouse, weather);
+            greenhouseRepository.save(greenhouse);
+        }
     }
 }

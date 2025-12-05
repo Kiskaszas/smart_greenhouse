@@ -16,4 +16,5 @@ public class WeatherDto {
     private Double humidity;
     private Double windSpeed;
     private Double precipitationMm;
+    private Double soilMoistureExtPct;
 }

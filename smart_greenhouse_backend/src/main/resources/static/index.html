@@ -12,98 +12,177 @@
 </header>
 
 <main class="layout">
-
+    <!-- Bal oszlop: üvegház lista -->
     <section class="card">
         <div class="card-header">
             <h2>Üvegházak</h2>
-            <div class="card-header-actions">
-                <button id="create-greenhouse-toggle" class="btn-secondary">
-                    Új üvegház
-                </button>
-                <button id="create-demo-btn" class="btn-primary">
-                    Demo üvegház
-                </button>
-            </div>
+            <button id="create-demo-btn" class="btn-primary">Új üvegház</button>
         </div>
-
-        <!-- Új üvegház felvétele űrlap -->
-        <form id="create-greenhouse-form" class="card-body form-compact hidden">
-            <div class="form-row">
-                <label for="gh-code">Kód*</label>
-                <input type="text" id="gh-code" name="code" required placeholder="pl. GREEN_1ST">
-            </div>
-
-            <div class="form-row">
-                <label for="gh-name">Név</label>
-                <input type="text" id="gh-name" name="name" placeholder="pl. Üvegház #1">
-            </div>
-
-            <div class="form-row">
-                <label for="gh-plant-type">Növény típusa*</label>
-                <select id="gh-plant-type" name="plantType" required>
-                    <option value="">Válassz típust…</option>
-                    <option value="TOMATO">Paradicsom (TOMATO)</option>
-                    <option value="PEPPER">Paprika (PEPPER)</option>
-                    <option value="JALAPENO">Jalapeno (JALAPENO)</option>
-                </select>
-            </div>
-
-            <div class="form-row">
-                <label for="gh-city">Város</label>
-                <input type="text" id="gh-city" name="city" placeholder="pl. Budapest">
-            </div>
-
-            <div class="form-row">
-                <label for="gh-lat">Szélesség (lat)</label>
-                <input type="number" step="0.0001" id="gh-lat" name="lat" placeholder="pl. 47.4979">
-            </div>
-
-            <div class="form-row">
-                <label for="gh-lon">Hosszúság (lon)</label>
-                <input type="number" step="0.0001" id="gh-lon" name="lon" placeholder="pl. 19.0402">
-            </div>
-
-            <button type="submit" class="btn-primary btn-full">
-                Üvegház létrehozása
-            </button>
-        </form>
-
         <div id="greenhouse-list" class="card-body empty-state">
             Még nincs üvegház az adatbázisban.
         </div>
     </section>
 
-    <section class="card">
-        <h2 id="details-title">Válassz egy üvegházat a listából…</h2>
+    <section class="card" id="details-card">
+        <div class="card-header">
+            <h2 id="details-title">Válassz egy üvegházat…</h2>
+            <span id="details-status-pill" class="status-pill status-pill--inactive">
+                Nincs kiválasztva
+            </span>
+            <label class="toggle-wrapper">
+                <label class="switch">
+                    <input type="checkbox" id="toggle-active">
+                    <span class="slider round"></span>
+                </label>
+            </label>
+        </div>
 
         <div id="greenhouse-details" class="card-body"></div>
+        <div id="greenhouse-details-devices" class="card-body"></div>
 
-        <div id="greenhouse-controls" class="control-panel">
-            <h3>Manuális vezérlés</h3>
 
-            <button id="btn-irrigation-on" class="btn-control">
-                Öntözés bekapcsolása
-            </button>
-            <button id="btn-irrigation-off" class="btn-control">
-                Öntözés kikapcsolása
-            </button>
+        <section id="sensor-section" class="card-body card-subsection hidden">
+            <div class="card-subheader">
+                <h3>Szenzorok</h3><br/>
+                <button id="btn-sensor-form-toggle" class="btn-secondary btn-small">
+                    Új / frissített szenzor érték
+                </button>
+            </div>
 
-            <button id="btn-ventilation-toggle" class="btn-control">
-                Szellőztetés váltása
-            </button>
+            <div id="sensor-list" class="sensor-list empty-state">
+                Ehhez az üvegházhoz még nincs szenzor regisztrálva.
+            </div>
 
-            <button id="btn-refresh" class="btn-secondary btn-full">
-                Adatok frissítése
-            </button>
+            <form id="sensor-form" class="sensor-form hidden">
+                <div class="form-row">
+                    <label for="sensor-id">Szenzor ID</label>
+                    <input id="sensor-id" type="text" required>
+                </div>
+                <div class="form-row">
+                    <label for="sensor-code">Szenzor kód</label>
+                    <input id="sensor-code" type="text" required>
+                </div>
+                <div class="form-row">
+                    <label for="sensor-type">Típus</label>
+                    <select id="sensor-type" required>
+                        <option value="temperature">Hőmérséklet</option>
+                        <option value="humidityPct">Páratartalom (%)</option>
+                        <option value="soilMoisturePct">Talajnedvesség (%)</option>
+                        <option value="windSpeed">Szélsebesség</option>
+                        <option value="precipitationMm">Csapadék (mm)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="sensor-unit">Mértékegység</label>
+                    <select id="sensor-unit" required>
+                        <option value="CELSIUS">°C</option>
+                        <option value="PERCENT">%</option>
+                        <option value="METER_PER_SECOND">m/s</option>
+                        <option value="MILLIMETER">mm</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="sensor-value">Utolsó érték</label>
+                    <input id="sensor-value" type="number" step="0.01" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Mentés</button>
+                    <button type="button" id="btn-sensor-form-cancel" class="btn-secondary">Mégse</button>
+                </div>
+            </form>
+        </section>
 
-            <button id="btn-delete" class="btn-danger btn-full">
-                Üvegház törlése
-            </button>
-        </div>
+        <section id="manual-control-card" class="card-body card-subsection hidden">
+            <div class="card-subheader">
+                <h3>Manuális vezérlés</h3>
+            </div>
+
+            <div class="manual-grid">
+                <div class="toggle-row">
+                    <span>Öntözés</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-irrigation">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Szellőztetés</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-ventilation">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Árnyékolás</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-shade">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Világítás</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-light">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Párásító</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-humidifier">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="manual-actions">
+                <button id="btn-refresh" class="btn-secondary">Adatok frissítése</button>
+                <button id="btn-delete" class="btn-danger">Üvegház törlése</button>
+            </div>
+        </section>
     </section>
 </main>
 
+<!-- notification rendszer konténere -->
 <div id="notification-container" class="notification-container"></div>
+
+<div id="modal-create-greenhouse" class="modal hidden">
+    <div class="modal-content">
+        <h3>Új üvegház létrehozása</h3>
+
+        <label for="greenHouse-name">Név</label>
+        <input id="greenHouse-name" type="text" placeholder="Üvegház #1">
+
+        <label for="greenHouse-code">Kód</label>
+        <input id="greenHouse-code" type="text" placeholder="GREEN_1ST">
+
+        <label for="greenHouse-plant-type">Növénytípus</label>
+        <select id="greenHouse-plant-type">
+            <option value="TOMATO">Paradicsom</option>
+            <option value="PEPPER">Paprika</option>
+            <option value="JALAPENO">Jalapeno</option>
+        </select>
+
+        <h4>Helyszín</h4>
+        <label for="greenHouse-city">Város</label>
+        <input id="greenHouse-city" type="text" placeholder="Budapest">
+
+        <label for="greenHouse-lat">Szélesség (lat)</label>
+        <input id="greenHouse-lat" type="number" step="0.0001" placeholder="47.4979">
+
+        <label for="greenHouse-lon">Hosszúság (lon)</label>
+        <input id="greenHouse-lon" type="number" step="0.0001" placeholder="19.0402">
+
+        <div class="modal-buttons">
+            <button id="btn-save-greenHouse" class="btn-primary">Létrehoz</button>
+            <button id="btn-cancel-greenHouse" class="btn-secondary">Mégse</button>
+        </div>
+    </div>
+</div>
 
 <script src="js/app.js"></script>
 </body>

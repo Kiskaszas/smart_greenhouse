@@ -59,7 +59,7 @@ public class SchedulerTasks {
      * javasolt SHADE_ON és VENT_OPEN"). Ezek a tervek segítenek a felhasználónak
      * előre látni a szükséges beavatkozásokat.
      */
-    @Scheduled(cron = "0 0 */1 * * *") // 12 óránként
+    @Scheduled(cron = "0 0 */12 * * *") // 12 óránként
     public void generatePlans() {
         service.generatePlans();
     }

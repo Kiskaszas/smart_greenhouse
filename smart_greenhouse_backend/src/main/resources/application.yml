@@ -51,3 +51,6 @@ logging:
   level:
     root: INFO
     org.greenhouse.smart_greenhouse_backend: DEBUG
+
+greenhouse:
+  simulation-interval-ms: 5000  # 5 másodperc

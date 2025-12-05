@@ -7,7 +7,7 @@ public enum Type {
     WIND_SPEED("windSpeed"),
     PRECIPITATION_MM("precipitationMm"),
     HUMIDITY_PCT("humidityPct"),
-    SOILMOISTUREPTC("soilMoisturePct");
+    SOILMOISTURE_PTC("soilMoisturePct");
 
     private final String type;
 

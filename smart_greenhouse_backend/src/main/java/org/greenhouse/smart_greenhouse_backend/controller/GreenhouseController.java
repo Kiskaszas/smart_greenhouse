@@ -6,12 +6,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.greenhouse.smart_greenhouse_backend.dto.PlanDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
-import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
-import org.greenhouse.smart_greenhouse_backend.model.documents.ActionLog;
-import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
-
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
+import org.greenhouse.smart_greenhouse_backend.model.documents.ActionLog;
+import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
+import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
 import org.greenhouse.smart_greenhouse_backend.service.greenhouse.GreenhouseService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -74,6 +73,17 @@ public class GreenhouseController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Üvegház actív/inaktívvá tétele.")
+    @ApiResponse(responseCode = "200", description = "Sikeres mentés")
+    @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel az ID-val")
+    @PostMapping("/{code}/active")
+    public Greenhouse setActive(
+            @PathVariable("code") String code,
+            @RequestParam("active") boolean active
+    ) {
+        return service.setActive(code, active);
+    }
+
     @Operation(summary = "Szenzoradat beküldése egy üvegházhoz")
     @ApiResponse(responseCode = "200", description = "Sikeres mentés")
     @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel az ID-val")
@@ -133,5 +143,13 @@ public class GreenhouseController {
     @GetMapping("/{code}/logs")
     public List<ActionLog> logs(@PathVariable("code") String code) {
         return service.getLogs(code);
+    }
+
+    @Operation(summary = "Adott szimuláció elindítása az üvegházra.")
+    @ApiResponse(responseCode = "200", description = "Akció sikeresen végrehajtva")
+    @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel az ID-val")
+    @PostMapping("/{code}/simulate")
+    public Greenhouse simulateNow(@PathVariable("code") String code) {
+        return service.simulateNow(code);
     }
 }

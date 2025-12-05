@@ -24,7 +24,6 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,7 +50,7 @@ class GreenhouseServiceImplTest {
     /**
      * Teszteli, hogy a create() metódus:
      * - hozzárendeli a PlantProfile ID-t, ha a plantType meg van adva
-     * - elmenti az üvegreenhouseázat a repository-ba
+     * - elmenti az üvegházat a repository-ba
      * - és ha nincs aktív terv, akkor generál egyet
      */
     @Test
@@ -81,7 +80,7 @@ class GreenhouseServiceImplTest {
 
         when(weatherService.fetchForecastForLocation(location.city(), location.lat(), location.lon()))
                 .thenReturn(Flux.just(
-                        new WeatherDto("Halásztelek", Instant.now(), 0.0, 0.0, 0.0, 0.0)
+                        new WeatherDto("Halásztelek", Instant.now(), 0.0, 0.0, 0.0, 0.0, 0.0)
                 ));
 
         when(greenhouseRepository.save(greenhouse)).thenReturn(greenhouse);
