@@ -514,7 +514,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         List<SensorRef> sensors = greenhouse.getSensors();
         Instant now = Instant.now();
 
-        // Külső időjárás – fallback alapértékekkel
+        // --------- KÜLSŐ IDŐJÁRÁS (fallback alapértékekkel) ---------
         double extTemp = weather.getTemperature() != null ? weather.getTemperature() : 20.0;
         double extHumidity = weather.getHumidity() != null ? weather.getHumidity() : 60.0;
 
@@ -540,42 +540,52 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         }
 
         // ---------- TALAJNEDVESSÉG (belső) ----------
+        // Ha van már belső talajnedvesség szenzor, abból indulunk ki,
+        // különben számolunk egy kezdeti értéket a külső adatokból.
         double soilMoist;
         Optional<SensorRef> existingSoil = sensors.stream()
                 .filter(s -> "SOIL_MOIST".equals(s.code()))
                 .findFirst();
 
         if (existingSoil.isPresent()) {
-            // már van korábbi érték → abból indulunk ki
             soilMoist = existingSoil.get().lastValue();
         } else {
-            // első érték: külső adatokból becsülve
             soilMoist = computeInitialSoilMoisture(extTemp, extHumidity);
         }
 
-        // öntözés / kiszáradás hatása
+        // Öntözés / kiszáradás hatása
+        // - ha öntözés megy: jobban nő
+        // - ha nem megy: nagyon lassan csökken csak
         if (devices.isIrrigationOn()) {
-            soilMoist = Math.min(100.0, soilMoist + 3.0);
+            // kicsit erősebb emelkedés
+            soilMoist += 1.5;
+            intHumidity += 0.2;
         } else {
-            soilMoist = Math.max(0.0, soilMoist - extTemp / 50.0);
+            // nagyon lassú "párolgás", hogy ne essen össze az érték
+            soilMoist -= 0.01;
         }
 
-        boolean autoIrrigationOff = false;
+        // clamp 0–100% közé
+        if (soilMoist < 0.0) {
+            soilMoist = 0.0;
+        } else if (soilMoist > 100.0) {
+            soilMoist = 100.0;
+        }
 
-        if (soilMoist >= 100.0 && devices.isIrrigationOn()) {
+        // Ha elérte a 100%-ot, automatikusan kapcsoljuk le az öntözést
+        if (devices.isIrrigationOn() && soilMoist >= 99.5) {
             soilMoist = 100.0;
             devices.setIrrigationOn(false);
-            autoIrrigationOff = true;
-        }
-
-        if (autoIrrigationOff) {
-            log.info("Irrigation auto-OFF in greenhouse {}: soil moisture reached 100%", greenhouse.getCode());
+            log.info(
+                    "Öntözés automatikus kikapcsolása üvegházban {}: a talaj nedvességtartalma elérte a 100%-ot",
+                    greenhouse.getCode()
+            );
         }
 
         // ---------- SZENZOROK FRISSÍTÉSE ----------
-        upsertSensor(sensors, "INT_TEMP", Type.TEMPERATURE, Unit.CELSIUS, intTemp, now);
+        upsertSensor(sensors, "INT_TEMP", Type.TEMPERATURE,      Unit.CELSIUS, intTemp,     now);
         upsertSensor(sensors, "INT_HUMIDITY", Type.HUMIDITY_PCT, Unit.PERCENT, intHumidity, now);
-        upsertSensor(sensors, "SOIL_MOIST", Type.SOILMOISTURE_PTC, Unit.PERCENT, soilMoist, now);
+        upsertSensor(sensors, "SOIL_MOIST",   Type.SOILMOISTURE_PTC, Unit.PERCENT, soilMoist, now);
     }
 
     private void upsertSensor(List<SensorRef> sensors,
