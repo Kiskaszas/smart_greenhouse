@@ -16,7 +16,7 @@
     <section class="card">
         <div class="card-header">
             <h2>Üvegházak</h2>
-            <button id="create-demo-btn" class="btn-primary">Új üvegház</button>
+            <button id="create-demo-btn" class="btn-primary" type="button">Új üvegház</button>
         </div>
         <div id="greenhouse-list" class="card-body empty-state">
             Még nincs üvegház az adatbázisban.
@@ -26,12 +26,12 @@
     <section class="card" id="details-card">
         <div class="card-header">
             <h2 id="details-title">Válassz egy üvegházat…</h2>
-            <span id="details-status-pill" class="status-pill status-pill--inactive">
-                Nincs kiválasztva
-            </span>
-            <label class="toggle-wrapper">
-                <label class="switch">
-                    <input type="checkbox" id="toggle-active">
+            <label class="toggle-wrapper" aria-hidden="false">
+                <span id="details-status-pill" class="status-pill status-pill--inactive">
+                    Nincs kiválasztva
+                </span>
+                <label class="switch" aria-label="Üvegház aktív állapota">
+                    <input type="checkbox" id="toggle-active" aria-labelledby="details-status-pill">
                     <span class="slider round"></span>
                 </label>
             </label>
@@ -40,11 +40,12 @@
         <div id="greenhouse-details" class="card-body"></div>
         <div id="greenhouse-details-devices" class="card-body"></div>
 
+        <button id="btn-show-actions" class="btn-secondary btn-small" type="button">Akció napló</button>
 
-        <section id="sensor-section" class="card-body card-subsection hidden">
+        <section id="sensor-section" class="card-body card-subsection hidden" aria-live="polite">
             <div class="card-subheader">
                 <h3>Szenzorok</h3><br/>
-                <button id="btn-sensor-form-toggle" class="btn-secondary btn-small">
+                <button id="btn-sensor-form-toggle" class="btn-secondary btn-small" type="button">
                     Új / frissített szenzor érték
                 </button>
             </div>
@@ -53,20 +54,30 @@
                 Ehhez az üvegházhoz még nincs szenzor regisztrálva.
             </div>
 
-            <form id="sensor-form" class="sensor-form hidden">
+            <form id="sensor-form" class="sensor-form hidden" data-editing="false" aria-hidden="true">
                 <div class="form-row">
                     <label for="sensor-id">Szenzor ID</label>
                     <input id="sensor-id" type="text" required>
                 </div>
+
+                <!-- Kód lenyíló menü: INT_TEMP, INT_HUMIDITY, SOIL_MOIST, WIND_SPEED -->
                 <div class="form-row">
                     <label for="sensor-code">Szenzor kód</label>
-                    <input id="sensor-code" type="text" required>
+                    <select id="sensor-code" required>
+                        <option value="">Válassz kódot…</option>
+                        <option value="INT_TEMP">INT_TEMP</option>
+                        <option value="INT_HUMIDITY">INT_HUMIDITY</option>
+                        <option value="SOIL_MOIST">SOIL_MOIST</option>
+                        <option value="WIND_SPEED">WIND_SPEED</option>
+                    </select>
                 </div>
+
                 <div class="form-row">
                     <label for="sensor-type">Típus</label>
-                    <select id="sensor-type" required>
+                    <select id="sensor-type">
+                        <option value="">Válassz típust…</option>
                         <option value="temperature">Hőmérséklet</option>
-                        <option value="humidityPct">Páratartalom (%)</option>
+                        <option value="humidityPct">Levegő páratartalom (%)</option>
                         <option value="soilMoisturePct">Talajnedvesség (%)</option>
                         <option value="windSpeed">Szélsebesség</option>
                         <option value="precipitationMm">Csapadék (mm)</option>
@@ -74,10 +85,11 @@
                 </div>
                 <div class="form-row">
                     <label for="sensor-unit">Mértékegység</label>
-                    <select id="sensor-unit" required>
+                    <select id="sensor-unit">
+                        <option value="">Válassz mértékegységet…</option>
                         <option value="CELSIUS">°C</option>
                         <option value="PERCENT">%</option>
-                        <option value="METER_PER_SECOND">m/s</option>
+                        <option value="KILO_METER_PER_HOUR">km/h</option>
                         <option value="MILLIMETER">mm</option>
                     </select>
                 </div>
@@ -85,6 +97,10 @@
                     <label for="sensor-value">Utolsó érték</label>
                     <input id="sensor-value" type="number" step="0.01" required>
                 </div>
+
+                <!-- Rejtett mező a lastSeen tárolására (szerkesztéskor betöltjük, mentéskor elküldjük) -->
+                <input type="hidden" id="sensor-lastseen" name="sensor-lastseen" value="">
+
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">Mentés</button>
                     <button type="button" id="btn-sensor-form-cancel" class="btn-secondary">Mégse</button>
@@ -140,46 +156,95 @@
             </div>
 
             <div class="manual-actions">
-                <button id="btn-refresh" class="btn-secondary">Adatok frissítése</button>
-                <button id="btn-delete" class="btn-danger">Üvegház törlése</button>
+                <button id="btn-refresh" class="btn-secondary" type="button">Adatok frissítése</button>
+                <button id="btn-delete" class="btn-danger" type="button">Üvegház törlése</button>
             </div>
         </section>
     </section>
 </main>
 
 <!-- notification rendszer konténere -->
-<div id="notification-container" class="notification-container"></div>
+<div id="notification-container" class="notification-container" aria-live="polite"></div>
 
-<div id="modal-create-greenhouse" class="modal hidden">
-    <div class="modal-content">
-        <h3>Új üvegház létrehozása</h3>
+<div id="modal-create-greenhouse" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-create-title" tabindex="-1">
+    <div class="modal-content" role="document">
+        <button id="btn-close-create-greenhouse" class="modal-close-top" aria-label="Bezár">✕</button>
 
-        <label for="greenHouse-name">Név</label>
-        <input id="greenHouse-name" type="text" placeholder="Üvegház #1">
+        <div class="modal-body-inner">
+            <h3 id="modal-create-title">Új üvegház létrehozása</h3>
 
-        <label for="greenHouse-code">Kód</label>
-        <input id="greenHouse-code" type="text" placeholder="GREEN_1ST">
+            <form id="form-create-greenhouse" class="form-compact" novalidate>
+                <div class="form-row">
+                    <label for="greenHouse-name">Név</label>
+                    <input id="greenHouse-name" type="text" placeholder="Üvegház #1">
+                </div>
 
-        <label for="greenHouse-plant-type">Növénytípus</label>
-        <select id="greenHouse-plant-type">
-            <option value="TOMATO">Paradicsom</option>
-            <option value="PEPPER">Paprika</option>
-            <option value="JALAPENO">Jalapeno</option>
-        </select>
+                <div class="form-row">
+                    <label for="greenHouse-code">Kód</label>
+                    <input id="greenHouse-code" type="text" placeholder="GREEN_1ST">
+                </div>
 
-        <h4>Helyszín</h4>
-        <label for="greenHouse-city">Város</label>
-        <input id="greenHouse-city" type="text" placeholder="Budapest">
+                <div class="form-row">
+                    <label for="greenHouse-plant-type">Növénytípus</label>
+                    <select id="greenHouse-plant-type">
+                        <option value="TOMATO">Paradicsom</option>
+                        <option value="PEPPER">Paprika</option>
+                        <option value="JALAPENO">Jalapeno</option>
+                    </select>
+                </div>
 
-        <label for="greenHouse-lat">Szélesség (lat)</label>
-        <input id="greenHouse-lat" type="number" step="0.0001" placeholder="47.4979">
+                <h4 style="margin-top:12px;margin-bottom:6px;">Helyszín</h4>
 
-        <label for="greenHouse-lon">Hosszúság (lon)</label>
-        <input id="greenHouse-lon" type="number" step="0.0001" placeholder="19.0402">
+                <div class="form-row">
+                    <label for="greenHouse-city">Város</label>
+                    <input id="greenHouse-city" type="text" placeholder="Budapest">
+                </div>
 
-        <div class="modal-buttons">
-            <button id="btn-save-greenHouse" class="btn-primary">Létrehoz</button>
-            <button id="btn-cancel-greenHouse" class="btn-secondary">Mégse</button>
+                <div class="form-row form-row-grid">
+                    <div>
+                        <label for="greenHouse-lat">Szélesség (lat)</label>
+                        <input id="greenHouse-lat" type="number" step="0.0001" placeholder="47.4979">
+                    </div>
+                    <div>
+                        <label for="greenHouse-lon">Hosszúság (lon)</label>
+                        <input id="greenHouse-lon" type="number" step="0.0001" placeholder="19.0402">
+                    </div>
+                </div>
+
+                <div class="modal-buttons" style="margin-top:14px;">
+                    <button id="btn-save-greenHouse" class="btn-primary" type="button">Létrehoz</button>
+                    <button id="btn-cancel-greenHouse" class="btn-secondary" type="button">Mégse</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="modal-action-log" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="action-log-title" tabindex="-1">
+    <div class="modal-content" role="document">
+        <h3 id="action-log-title" style="padding:12px 16px 0;margin:0;">Akció napló</h3>
+
+        <div id="action-log-controls" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div>
+                <label for="action-log-page-size" style="font-size:0.85rem;color:#374151;">Oldalméret:</label>
+                <select id="action-log-page-size" style="margin-left:6px;padding:4px 6px;">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                <button id="action-log-prev" class="btn-secondary btn-small" type="button">Előző</button>
+                <span id="action-log-page-info" style="font-size:0.9rem;color:#374151;">0 / 0</span>
+                <button id="action-log-next" class="btn-secondary btn-small" type="button">Következő</button>
+            </div>
+        </div>
+
+        <div id="action-log-list" class="action-log-list" style="min-height:120px;max-height: 80%;">Betöltés…</div>
+
+        <div class="modal-actions" style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+            <button id="btn-close-action-log" class="btn-secondary" type="button">Bezár</button>
         </div>
     </div>
 </div>

@@ -30,4 +30,11 @@ public interface SensorService {
      * @return void
      */
     void updateByCode(String sensorCode, SensorData sensor);
+
+    /**
+     * A szenzor törlése a szenzor code és a greenhouse code alapján.
+     * @param sensorId
+     * @param greenhouseCode
+     */
+    void deleteByIdAndGreenhouseCode(String sensorId, String greenhouseCode);
 }

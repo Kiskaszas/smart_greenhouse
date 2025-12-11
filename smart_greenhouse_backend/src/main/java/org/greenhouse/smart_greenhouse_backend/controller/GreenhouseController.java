@@ -3,6 +3,7 @@ package org.greenhouse.smart_greenhouse_backend.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.greenhouse.smart_greenhouse_backend.dto.PlanDto;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
@@ -11,7 +12,12 @@ import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
 import org.greenhouse.smart_greenhouse_backend.model.documents.ActionLog;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Greenhouse;
 import org.greenhouse.smart_greenhouse_backend.model.documents.Plan;
+import org.greenhouse.smart_greenhouse_backend.service.actionLog.ActionLogService;
 import org.greenhouse.smart_greenhouse_backend.service.greenhouse.GreenhouseService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,19 +31,13 @@ public class GreenhouseController {
 
     private final GreenhouseService service;
 
+    private final ActionLogService actionLogService;
+
     @Operation(summary = "Új üvegház létrehozása")
     @ApiResponse(responseCode = "200", description = "Sikeres mentés")
     @PostMapping
     public Greenhouse create(@RequestBody Greenhouse greenhouse) {
         return service.create(greenhouse);
-    }
-
-    @Operation(summary = "Demo üvegház létrehozása, ha még nincs")
-    @ApiResponse(responseCode = "200", description = "Demo üvegház létrehozva vagy már létezett")
-    @PostMapping("/demo")
-    public ResponseEntity<Greenhouse> createDemoGreenhouse() {
-        Greenhouse demo = service.createDemoGreenhouseIfNotExists();
-        return ResponseEntity.ok(demo);
     }
 
     @Operation(summary = "Üvegházak listázása")
@@ -88,8 +88,26 @@ public class GreenhouseController {
     @ApiResponse(responseCode = "200", description = "Sikeres mentés")
     @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel az ID-val")
     @PostMapping("/{code}/sensors")
-    public Greenhouse addSensorData(@PathVariable("code") String code, @RequestBody SensorRef sensor) {
+    public Greenhouse addSensorData(@PathVariable("code") String code,
+                                    @Valid @RequestBody SensorRef sensor
+    ) {
         return service.addSensorData(code, sensor);
+    }
+
+    @Operation(summary = "Szenzoradat frissítése egy üvegházon")
+    @ApiResponse(responseCode = "200", description = "Sikeres mentés")
+    @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel az ID-val")
+    @PutMapping("/{code}/{sensorId}")
+    public Greenhouse updateSensorData(@PathVariable("code") String code, @Valid @RequestBody SensorRef sensor) {
+        return service.updateSensorData(code, sensor);
+    }
+
+    @Operation(summary = "Szenzoradat törlése egy üvegháról")
+    @ApiResponse(responseCode = "200", description = "Sikeres mentés")
+    @ApiResponse(responseCode = "404", description = "Nem található üvegház ezzel az ID-val")
+    @DeleteMapping("/{code}/{sensorId}")
+    public Greenhouse deleteSensorData(@PathVariable("code") String code, @PathVariable("sensorId") String sensorId) {
+        return service.removeSensorData(code, sensorId);
     }
 
     @Operation(summary = "Eszközök aktuális állapotának lekérése")
@@ -151,5 +169,17 @@ public class GreenhouseController {
     @PostMapping("/{code}/simulate")
     public Greenhouse simulateNow(@PathVariable("code") String code) {
         return service.simulateNow(code);
+    }
+
+    // ActionLogController.java (vagy GreenhouseController-be illeszd)
+    @GetMapping("/{code}/actions")
+    public ResponseEntity<Page<ActionLog>> getActionLogs(
+            @PathVariable("code") String code,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size
+    ) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "timestamp"));
+        Page<ActionLog> logs = actionLogService.findByGreenhouseCode(code, pageable);
+        return ResponseEntity.ok(logs);
     }
 }

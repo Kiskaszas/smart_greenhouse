@@ -2,10 +2,10 @@ package org.greenhouse.smart_greenhouse_backend.service.greenhouse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.greenhouse.smart_greenhouse_backend.config.PlantProfileLoader;
 import org.greenhouse.smart_greenhouse_backend.dto.WeatherDto;
 import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseAlreadyExistsException;
 import org.greenhouse.smart_greenhouse_backend.exception.GreenhouseNotFoundException;
-import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundException;
 import org.greenhouse.smart_greenhouse_backend.exception.PlanNotFoundForGreenhouseException;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.Location;
@@ -17,9 +17,9 @@ import org.greenhouse.smart_greenhouse_backend.model.documents.*;
 import org.greenhouse.smart_greenhouse_backend.repository.*;
 import org.greenhouse.smart_greenhouse_backend.service.rule_evaluator.RuleEvaluatorService;
 import org.greenhouse.smart_greenhouse_backend.service.weather.WeatherService;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -39,19 +39,23 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     private final WeatherService weatherService;
     private final RuleEvaluatorService ruleEvaluatorService;
 
+    private final PlantProfileLoader plantProfileLoader;
+
+    private static final Duration ACTION_COOLDOWN = Duration.ofMinutes(5); // 5 perc cooldown
+
     @Override
     public Greenhouse create(final Greenhouse greenhouse) {
-        if(!greenhouseRepository.existsByCode(greenhouse.getCode())) {
+        if (!greenhouseRepository.existsByCode(greenhouse.getCode())) {
             if (greenhouse.getPlantType() != null) {
                 PlantProfile profile = plantProfileRepository.findByPlantType(greenhouse.getPlantType())
-                        .orElseThrow(() -> new PlanNotFoundException(greenhouse.getPlantType()));
+                        .orElse(ensurePlantProfileForGreenhouse(greenhouse));
+
                 greenhouse.setPlantProfileId(profile.getId());
             }
 
             Greenhouse saved = greenhouseRepository.save(greenhouse);
 
-            // ha az adott greenhouse-hoz nincs aktív terv, automatikusan generáljunk egyet
-            boolean hasPlan = planRepository.findByGreenhouseCode(saved.getCode()) // inkább code, nem id
+            boolean hasPlan = planRepository.findByGreenhouseCode(saved.getCode())
                     .stream()
                     .anyMatch(Plan::isActive);
 
@@ -60,7 +64,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             }
             return saved;
         }
-        throw new GreenhouseAlreadyExistsException("Az üvegház már lérezik ezzel a kóddal");
+        throw new GreenhouseAlreadyExistsException("Az üvegház már létezik ezzel a kóddal");
     }
 
     @Override
@@ -101,8 +105,16 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         return greenhouseRepository.save(greenhouse);
     }
 
+    void validateSensorDatas(final String code, final SensorRef sensor) {
+        if (code == null || sensor == null) {
+            throw new GreenhouseNotFoundException("A megadott értékkekkel nem található a szenzor");
+        }
+    }
+
     @Override
     public Greenhouse addSensorData(final String code, final SensorRef sensor) {
+        validateSensorDatas(code, sensor);
+
         Greenhouse greenhouse = getByCode(code);
 
         SensorRef sensorWithTimestamp = sensor.lastSeen() == null
@@ -117,13 +129,63 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 : sensor;
 
         greenhouse.getSensors().removeIf(sensorRef ->
-                Objects.equals(sensorRef.id(), sensor.id())
-                        && Objects.equals(sensorRef.code(), sensor.code())
+                (sensor.id() != null && Objects.equals(sensorRef.id(), sensor.id()))
+                        || (sensor.code() != null && Objects.equals(sensorRef.code(), sensor.code()))
         );
 
         greenhouse.getSensors().add(sensorWithTimestamp);
 
         return greenhouseRepository.save(greenhouse);
+    }
+
+    @Override
+    public Greenhouse updateSensorData(String code, SensorRef sensor) {
+        validateSensorDatas(code, sensor);
+        Greenhouse greenhouse = getByCode(code);
+
+        int idx = -1;
+        for (int i = 0; i < greenhouse.getSensors().size(); i++) {
+            SensorRef s = greenhouse.getSensors().get(i);
+            if (Objects.equals(s.id(), sensor.id()) || Objects.equals(s.code(), sensor.code())) {
+                idx = i;
+                break;
+            }
+        }
+
+        if (idx == -1) {
+            Greenhouse newGreenhouse = addSensorData(code, sensor);
+            return newGreenhouse;
+        }
+
+        SensorRef existing = greenhouse.getSensors().get(idx);
+
+        SensorRef updated = new SensorRef(
+                sensor.id() != null ? sensor.id() : existing.id(),
+                sensor.code() != null ? sensor.code() : existing.code(),
+                sensor.type() != null ? sensor.type() : existing.type(),
+                sensor.unit() != null ? sensor.unit() : existing.unit(),
+                sensor.lastValue() != null ? sensor.lastValue() : existing.lastValue(),
+                sensor.lastSeen() != null ? sensor.lastSeen() : Instant.now()
+        );
+
+        greenhouse.getSensors().set(idx, updated);
+
+        return greenhouseRepository.save(greenhouse);
+    }
+
+    @Override
+    public Greenhouse removeSensorData(String code, String sensorId) {
+        Greenhouse greenhouse = getByCode(code);
+
+        boolean removed = greenhouse.getSensors().removeIf(sensorRef ->
+                (sensorId != null && Objects.equals(sensorRef.id(), sensorId))
+        );
+
+        if (removed) {
+            return greenhouseRepository.save(greenhouse);
+        } else {
+            return greenhouse;
+        }
     }
 
     @Override
@@ -134,9 +196,22 @@ public class GreenhouseServiceImpl implements GreenhouseService {
     @Override
     public DeviceState manualAction(final String id, final String action) {
         Greenhouse greenhouse = getByCode(id);
+        if (greenhouse.getDevices() == null) greenhouse.setDevices(new DeviceState());
         DeviceState devices = greenhouse.getDevices();
+        if (devices.getLastManualActionAt() == null) devices.setLastManualActionAt(new HashMap<>());
 
-        switch (action.toUpperCase()) {
+        String normalized = action == null ? "" : action.toUpperCase(Locale.ROOT).trim();
+
+        String manualKey = switch (normalized) {
+            case "IRRIGATION_ON", "IRRIGATION_OFF" -> "IRRIGATION";
+            case "VENT_OPEN", "VENT_CLOSE" -> "VENT";
+            case "SHADE_ON", "SHADE_OFF" -> "SHADE";
+            case "LIGHT_ON", "LIGHT_OFF" -> "LIGHT";
+            case "HUMIDIFIER_ON", "HUMIDIFIER_OFF" -> "HUMIDIFIER";
+            default -> null;
+        };
+
+        switch (normalized) {
             case "IRRIGATION_ON" -> devices.setIrrigationOn(true);
             case "IRRIGATION_OFF" -> devices.setIrrigationOn(false);
             case "VENT_OPEN" -> devices.setVentOpen(true);
@@ -150,15 +225,26 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             default -> throw new IllegalArgumentException("Unknown action: " + action);
         }
 
+        String key = manualKey.toUpperCase(Locale.ROOT);
+        devices.getLastManualActionAt().put(key, Instant.now());
+        setLastActionTimestamp(greenhouse, key, Instant.now());
         greenhouseRepository.save(greenhouse);
 
-        // naplózás
-        ActionLog log = new ActionLog();
-        log.setGreenhouseCode(id);
-        log.setTimestamp(Instant.now());
-        log.setAction(action);
-        log.setReason("manual");
-        actionLogRepository.save(log);
+        ActionLog actionLog = new ActionLog();
+        actionLog.setGreenhouseCode(id);
+        actionLog.setTimestamp(Instant.now());
+        actionLog.setAction(action);
+        actionLog.setReason("manual");
+        actionLogRepository.save(actionLog);
+
+        // Azonnali simulate, hogy a frontend a friss szenzorokat kapja
+        try {
+            WeatherDto weather = fetchWeatherForGreenhouse(id);
+            simulateInternalEnvironment(greenhouse, weather);
+            greenhouseRepository.save(greenhouse);
+        } catch (Exception e) {
+            log.debug("simulate after manual action failed for {}: {}", id, e.getMessage());
+        }
 
         return devices;
     }
@@ -206,11 +292,14 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         for (Greenhouse greenhouse : greenhouseRepository.findAll()) {
             if (!greenhouse.isActive()) continue;
 
-            PlantProfile profile = plantProfileRepository.findByPlantCode(greenhouse.getCode())
-                    .orElse(null);
-            if (profile == null) continue;
+            PlantProfile profile = plantProfileRepository.findById(greenhouse.getPlantProfileId()).orElse(null);
+            if (profile == null) {
+                log.warn("Nincs plant profile a greenhouse {}-hoz (id={})", greenhouse.getCode(), greenhouse.getPlantProfileId());
+                continue;
+            }
 
             Map<Type, Double> values = greenhouse.getSensors().stream()
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toMap(
                             SensorRef::type,
                             SensorRef::lastValue,
@@ -263,7 +352,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             List<String> actions = ruleEvaluatorService.evaluate(profile, values);
             applyActions(greenhouse, actions, "weather-check");
         }
-        log.info("evaluateRulesFromWeather lefutott");
+        log.info("Időjárás lekérés lefutott");
     }
 
     @Override
@@ -272,6 +361,53 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             if (!greenhouse.isActive()) continue;
             generatePlanForNewGreenhouse(greenhouse);
         }
+    }
+
+    private PlantProfile ensurePlantProfileForGreenhouse(Greenhouse greenhouse) {
+        if (greenhouse == null) return null;
+
+        // Ha már van plantProfileId, próbáljuk meg lekérni az adatbázisból
+        if (greenhouse.getPlantProfileId() != null) {
+            return plantProfileRepository.findById(greenhouse.getPlantProfileId()).orElse(null);
+        }
+
+        // Ha nincs plantProfileId, de van plantType, próbáljuk meg betölteni a resources-ból
+        String plantType = greenhouse.getPlantType();
+        if (plantType == null || plantType.isBlank()) {
+            log.debug("No plantType for greenhouse {}, cannot load profile from resources", greenhouse.getCode());
+            return null;
+        }
+
+        // Először ellenőrizzük, hogy nincs-e már DB-ben profile a plantType alapján
+        Optional<PlantProfile> existing = plantProfileRepository.findByPlantType(plantType);
+        if (existing.isPresent()) {
+            PlantProfile p = existing.get();
+            greenhouse.setPlantProfileId(p.getId());
+            greenhouseRepository.save(greenhouse);
+            return p;
+        }
+
+        // Ha nincs DB-ben, próbáljuk betölteni a resources/plant-profiles/{plantType}.yml fájlból
+        try {
+            PlantProfile loaded = plantProfileLoader.loadProfile(plantType);
+            if (loaded != null) {
+                // biztosítsuk, hogy a plantType/plantCode be legyen állítva (ha a loader nem tenné)
+                if (loaded.getPlantType() == null) loaded.setPlantType(plantType);
+                if (loaded.getPlantCode() == null) loaded.setPlantCode(plantType);
+
+                PlantProfile saved = plantProfileRepository.save(loaded);
+                greenhouse.setPlantProfileId(saved.getId());
+                greenhouseRepository.save(greenhouse);
+                log.info("Loaded plant profile for greenhouse {} from resources: {}", greenhouse.getCode(), plantType);
+                return saved;
+            } else {
+                log.debug("PlantProfileLoader returned null for plantType {}", plantType);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load plant profile for type {} from resources: {}", plantType, e.getMessage());
+        }
+
+        return null;
     }
 
     private void generatePlanForNewGreenhouse(final Greenhouse greenhouse) {
@@ -365,7 +501,6 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             WeatherDto weather = fetchWeatherForGreenhouse(greenhouse.getCode());
             if (weather == null) continue;
 
-            // 1) Külső időjárás snapshot (ahogy eddig is csináltad)
             WeatherSnapshot snapshot = WeatherSnapshot.builder()
                     .greenhouseCode(greenhouse.getCode())
                     .timestamp(Instant.now())
@@ -374,12 +509,10 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                     .humidity(weather.getHumidity())
                     .windSpeed(weather.getWindSpeed())
                     .precipitationMm(weather.getPrecipitationMm())
-                    // ha van soilMoistureExtPct a WeatherDto-ban:
-                    //.soilMoistureExtPct(weather.getSoilMoistureExtPct())
+                    .soilMoistureExtPct(weather.getSoilMoistureExtPct())
                     .build();
             weatherSnapshotRepository.save(snapshot);
 
-            // 2) BELSŐ KÖRNYEZET SZIMULÁCIÓ
             simulateInternalEnvironment(greenhouse, weather);
 
             log.info("Actual weatherSnapshot: {}", snapshot);
@@ -387,46 +520,176 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         }
     }
 
-    /**
-     * Akciók alkalmazása egy üvegházban és naplózása.
-     */
+    private boolean isInCooldown(Greenhouse greenhouse, String action) {
+        if (greenhouse == null || action == null) return false;
+        Map<String, Instant> lastActionAt = greenhouse.getLastActionAt();
+        if (lastActionAt == null) return false;
+        Instant last = lastActionAt.get(action);
+        if (last == null) return false;
+        return Instant.now().isBefore(last.plus(ACTION_COOLDOWN));
+    }
+
+    private void setLastActionTimestamp(Greenhouse greenhouse, String action, Instant when) {
+        if (greenhouse == null || action == null) return;
+        if (greenhouse.getLastActionAt() == null) {
+            greenhouse.setLastActionAt(new HashMap<>());
+        }
+        greenhouse.getLastActionAt().put(action, when);
+    }
+
     private void applyActions(final Greenhouse greenhouse,
                               final List<String> actions,
                               final String reason) {
+        if (greenhouse == null || actions == null || actions.isEmpty()) return;
+
         DeviceState devices = greenhouse.getDevices();
+        boolean changed = false;
+
         for (String action : actions) {
-            switch (action) {
-                case "IRRIGATION_ON" -> devices.setIrrigationOn(true);
-                case "VENT_OPEN" -> devices.setVentOpen(true);
-                case "SHADE_ON" -> devices.setShadeOn(true);
-                case "LIGHT_ON" -> devices.setLightOn(true);
-                case "HUMIDIFIER_ON" -> devices.setHumidifierOn(true);
+            if (!shouldApplyAction(greenhouse, action)) {
+                log.debug("Skipping action {} for {} because shouldApplyAction returned false", action, greenhouse.getCode());
+                continue;
             }
+
+            if (isInCooldown(greenhouse, action)) {
+                log.debug("Skipping action {} for {} due to cooldown", action, greenhouse.getCode());
+                continue;
+            }
+
+            boolean applied = false;
+            switch (action) {
+                case "IRRIGATION_ON":
+                    if (!Boolean.TRUE.equals(devices.isIrrigationOn())) {
+                        devices.setIrrigationOn(true);
+                        applied = true;
+                    }
+                    break;
+                case "IRRIGATION_OFF":
+                    if (!Boolean.FALSE.equals(devices.isIrrigationOn())) {
+                        devices.setIrrigationOn(false);
+                        applied = true;
+                    }
+                    break;
+                case "VENT_OPEN":
+                    if (!Boolean.TRUE.equals(devices.isVentOpen())) {
+                        devices.setVentOpen(true);
+                        applied = true;
+                    }
+                    break;
+                case "VENT_CLOSE":
+                    if (!Boolean.FALSE.equals(devices.isVentOpen())) {
+                        devices.setVentOpen(false);
+                        applied = true;
+                    }
+                    break;
+                case "SHADE_ON":
+                    if (!Boolean.TRUE.equals(devices.isShadeOn())) {
+                        devices.setShadeOn(true);
+                        applied = true;
+                    }
+                    break;
+                case "SHADE_OFF":
+                    if (!Boolean.FALSE.equals(devices.isShadeOn())) {
+                        devices.setShadeOn(false);
+                        applied = true;
+                    }
+                    break;
+                case "LIGHT_ON":
+                    if (!Boolean.TRUE.equals(devices.isLightOn())) {
+                        devices.setLightOn(true);
+                        applied = true;
+                    }
+                    break;
+                case "LIGHT_OFF":
+                    if (!Boolean.FALSE.equals(devices.isLightOn())) {
+                        devices.setLightOn(false);
+                        applied = true;
+                    }
+                    break;
+                case "HUMIDIFIER_ON":
+                    if (!Boolean.TRUE.equals(devices.isHumidifierOn())) {
+                        devices.setHumidifierOn(true);
+                        applied = true;
+                    }
+                    break;
+                case "HUMIDIFIER_OFF":
+                    if (!Boolean.FALSE.equals(devices.isHumidifierOn())) {
+                        devices.setHumidifierOn(false);
+                        applied = true;
+                    }
+                    break;
+                default:
+                    log.warn("Ismeretlen action: {}", action);
+            }
+
             ActionLog logEntry = new ActionLog();
             logEntry.setGreenhouseCode(greenhouse.getCode());
             logEntry.setTimestamp(Instant.now());
             logEntry.setAction(action);
             logEntry.setReason(reason);
             actionLogRepository.save(logEntry);
+
+            if (applied) {
+                setLastActionTimestamp(greenhouse, action, Instant.now());
+                changed = true;
+            }
         }
-        greenhouseRepository.save(greenhouse);
+
+        if (changed) {
+            greenhouseRepository.save(greenhouse);
+            log.info("Saved greenhouse {} after applying actions, devices: {}", greenhouse.getCode(), greenhouse.getDevices());
+        } else {
+            log.debug("No device changes for {}, skipping save", greenhouse.getCode());
+        }
     }
 
-    @Override
-    public Greenhouse createDemoGreenhouseIfNotExists() {
-        if (greenhouseRepository.count() > 0) {
-            return greenhouseRepository.findAll().get(0);
+    private boolean shouldApplyAction(Greenhouse greenhouse, String action) {
+        if (greenhouse == null || action == null) return false;
+        if (greenhouse.getPlantProfileId() == null) return false;
+
+        // Example hysteresis for irrigation only; other actions can be extended similarly
+        if ("IRRIGATION_ON".equals(action)) {
+            Double soil = currentSoilMoisture(greenhouse);
+            if (soil == null) return false;
+            return soil < 30.0;
+        }
+        if ("IRRIGATION_OFF".equals(action)) {
+            Double soil = currentSoilMoisture(greenhouse);
+            if (soil == null) return false;
+            return soil > 40.0;
         }
 
-        Location demoLocation = new Location("Kecskemét", 46.8963711, 19.68996861);
-        Greenhouse demo = new Greenhouse();
-        demo.setCode("DEMO-1");
-        demo.setName("Demo üvegház");
-        demo.setLocation(demoLocation);
-        demo.setPlantProfileId(null);
-        demo.setPlanId(null);
+        return true;
+    }
 
-        return greenhouseRepository.save(demo);
+    private Double currentSoilMoisture(Greenhouse greenhouse) {
+        if (greenhouse == null) return null;
+        List<SensorRef> sensors = greenhouse.getSensors();
+        if (sensors == null || sensors.isEmpty()) return null;
+
+        double sum = 0.0;
+        int count = 0;
+
+        for (SensorRef s : sensors) {
+            if (s == null) continue;
+            Double value = s.lastValue();
+            if (value == null) continue;
+
+            String code = s.code();
+            Type type = s.type();
+
+            boolean isSoil =
+                    (code != null && code.equalsIgnoreCase("SOIL_MOIST"))
+                            || (type != null && type == Type.SOILMOISTURE_PTC);
+
+            if (isSoil) {
+                sum += value;
+                count++;
+            }
+        }
+
+        if (count == 0) return null;
+        return sum / count;
     }
 
     @Override
@@ -453,26 +716,23 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         return greenhouseRepository.save(greenhouse);
     }
 
-    /**
-     * Belső (virtuális) szenzor upsert egy üvegházhoz.
-     * Ha létezik a given code, töröljük és új SensorRef-et teszünk be friss értékkel.
-     */
     private void upsertInternalSensor(Greenhouse greenhouse,
                                       String sensorCode,
                                       Type type,
                                       Unit unit,
                                       double value) {
-        var sensors = greenhouse.getSensors();
+        if (greenhouse == null || sensorCode == null) return;
+        List<SensorRef> sensors = greenhouse.getSensors();
         if (sensors == null) {
             sensors = new ArrayList<>();
             greenhouse.setSensors(sensors);
         }
-
-        sensors.removeIf(sr -> Objects.equals(sr.code(), sensorCode));
+        String normalized = sensorCode.trim();
+        sensors.removeIf(sr -> sr != null && sr.code() != null && sr.code().equalsIgnoreCase(normalized));
 
         SensorRef updated = new SensorRef(
-                sensorCode,
-                sensorCode,
+                null,
+                normalized,
                 type,
                 unit,
                 value,
@@ -481,7 +741,6 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         sensors.add(updated);
     }
 
-    //Mini units
     private double clamp(double v, double min, double max) {
         return Math.max(min, Math.min(max, v));
     }
@@ -490,154 +749,335 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         return current + (target - current) * alpha;
     }
 
+    private double smooth(double prev, double target, double alpha) {
+        return linearInterpolation(prev, target, alpha);
+    }
+
     private double readInternalSensorOrDefault(Greenhouse greenhouse,
                                                String sensorCode,
                                                Type type,
                                                double defaultValue) {
         return greenhouse.getSensors().stream()
-                .filter(s -> s.type() == type && sensorCode.equals(s.code()))
+                .filter(s -> s != null && s.type() == type && sensorCode.equalsIgnoreCase(s.code()))
                 .map(SensorRef::lastValue)
                 .findFirst()
                 .orElse(defaultValue);
     }
 
-    private double computeInitialSoilMoisture(double extTemp, double extHumidity) {
-        // nagyon egyszerű modell: a páratartalom dominál, a meleg kicsit szárít
-        double base = extHumidity * 0.7 - Math.max(0, extTemp - 15) * 1.5;
-        // 10–90% közé szorítjuk
-        return Math.max(10.0, Math.min(90.0, base));
+    private void updateSensorIfExists(List<SensorRef> sensors,
+                                      String code,
+                                      Type type,
+                                      Unit unit,
+                                      Double value,
+                                      Instant now) {
+        if (sensors == null || code == null) return;
+        for (int i = 0; i < sensors.size(); i++) {
+            SensorRef s = sensors.get(i);
+            if (s != null && s.code() != null && code.equalsIgnoreCase(s.code())) {
+                SensorRef updated = new SensorRef(
+                        s.id(),
+                        s.code(), // megtartjuk az eredeti kód formátumát
+                        type,
+                        unit,
+                        value,
+                        now
+                );
+                sensors.set(i, updated);
+                return;
+            }
+        }
     }
 
-    // #############---- SIMULATION ---######################
+    private double computePlantUptakeFactor(
+            final Greenhouse greenhouse,
+            final double intTemp,
+            final double currentSoilMoist, final
+            PlantProfile profile
+    ) {
+        double base = 0.01;
+        if (profile != null && profile.getSoilMoistureRangePct() != null) {
+            Double min = profile.getSoilMoistureRangePct().min();
+            Double max = profile.getSoilMoistureRangePct().max();
+            if (min != null && max != null) {
+                double desired = (min + max) / 2.0;
+                double diff = Math.max(0, desired - currentSoilMoist);
+                base = 0.01 + Math.min(0.05, diff / 100.0);
+            }
+        }
+        // temperature influence
+        double tempFactor = 1.0 + Math.max(0, (intTemp - 20.0)) / 50.0;
+        return base * tempFactor;
+    }
+
+    private double computeInitialSoilMoisture(double extTemp, double extHumidity, double extSoilPct) {
+        // simple heuristic: external soil pct adjusted by humidity and temperature
+        double v = extSoilPct;
+        v += (extHumidity - 50.0) * 0.05;
+        v -= Math.max(0, extTemp - 20.0) * 0.2;
+        return clamp(v, 0.0, 100.0);
+    }
+
+    /**
+     * A szimuláció fő metódusa: frissíti a belső értékeket, upserteli a virtuális szenzorokat,
+     * és alkalmazza a profilból eredő automata akciókat (manuális védelem + cooldown figyelembevételével).
+     */
     private void simulateInternalEnvironment(Greenhouse greenhouse, WeatherDto weather) {
+        if (greenhouse == null) return;
+        if (greenhouse.getDevices() == null) greenhouse.setDevices(new DeviceState());
+        if (greenhouse.getSensors() == null) greenhouse.setSensors(new ArrayList<>());
+
         DeviceState devices = greenhouse.getDevices();
         List<SensorRef> sensors = greenhouse.getSensors();
         Instant now = Instant.now();
 
-        // --------- KÜLSŐ IDŐJÁRÁS (fallback alapértékekkel) ---------
-        double extTemp = weather.getTemperature() != null ? weather.getTemperature() : 20.0;
-        double extHumidity = weather.getHumidity() != null ? weather.getHumidity() : 60.0;
+        double extTemp = weather != null && weather.getTemperature() != null ? weather.getTemperature() : 20.0;
+        double extWind = weather != null && weather.getWindSpeed() != null ? weather.getWindSpeed() : 0.0;
+        double extSoil = weather != null && weather.getSoilMoistureExtPct() != null ? weather.getSoilMoistureExtPct() : 30.0;
+        double extHum = weather != null && weather.getHumidity() != null ? weather.getHumidity() : 60.0;
 
-        // ---------- BELSŐ HŐMÉRSÉKLET ----------
-        double intTemp = extTemp;
-        if (devices.isLightOn()) {
-            intTemp += 1.5;
-        }
-        if (devices.isVentOpen()) {
-            intTemp -= 1.0;
-        }
-        if (devices.isShadeOn()) {
-            intTemp -= 0.5;
-        }
+        // belső értékek (eszközök hatása)
+        double intTemp = extTemp + (Boolean.TRUE.equals(devices.isLightOn()) ? 1.5 : 0.0)
+                - (Boolean.TRUE.equals(devices.isVentOpen()) ? 1.0 : 0.0)
+                - (Boolean.TRUE.equals(devices.isShadeOn()) ? 0.5 : 0.0);
 
-        // ---------- BELSŐ PÁRATARTALOM ----------
-        double intHumidity = extHumidity;
-        if (devices.isHumidifierOn()) {
-            intHumidity += 5.0;
-        }
-        if (devices.isVentOpen()) {
-            intHumidity -= 3.0;
-        }
+        double intWind = extWind + (Boolean.TRUE.equals(devices.isVentOpen()) ? 0.5 : 0.0);
+        intWind = clamp(intWind, 0.0, 20.0);
 
-        // ---------- TALAJNEDVESSÉG (belső) ----------
-        // Ha van már belső talajnedvesség szenzor, abból indulunk ki,
-        // különben számolunk egy kezdeti értéket a külső adatokból.
-        double soilMoist;
-        Optional<SensorRef> existingSoil = sensors.stream()
-                .filter(s -> "SOIL_MOIST".equals(s.code()))
+        double intHum = extHum + (Boolean.TRUE.equals(devices.isHumidifierOn()) ? 5.0 : 0.0)
+                - (Boolean.TRUE.equals(devices.isVentOpen()) ? 3.0 : 0.0);
+        intHum = clamp(intHum, 0.0, 100.0);
+
+        // talajnedvesség: prefer szenzor, különben becslés
+        double soil;
+        Optional<SensorRef> sSoil = sensors.stream()
+                .filter(s -> s != null && s.code() != null && "SOIL_MOIST".equalsIgnoreCase(s.code()))
                 .findFirst();
+        if (sSoil.isPresent() && sSoil.get().lastValue() != null) soil = sSoil.get().lastValue();
+        else soil = computeInitialSoilMoisture(extTemp, extHum, extSoil);
 
-        if (existingSoil.isPresent()) {
-            soilMoist = existingSoil.get().lastValue();
+        // öntözés / evap / növényfelvétel
+        if (Boolean.TRUE.equals(devices.isIrrigationOn())) {
+            soil += 1.5;
+            intHum += 0.2;
         } else {
-            soilMoist = computeInitialSoilMoisture(extTemp, extHumidity);
+            double evap = 0.01 + Math.max(0, (intTemp - 15.0)) * 0.0008 + intWind * 0.0005;
+            evap *= (1.0 + Math.max(0, (50.0 - intHum)) / 200.0);
+            soil -= evap;
         }
 
-        // Öntözés / kiszáradás hatása
-        // - ha öntözés megy: jobban nő
-        // - ha nem megy: nagyon lassan csökken csak
-        if (devices.isIrrigationOn()) {
-            // kicsit erősebb emelkedés
-            soilMoist += 1.5;
-            intHumidity += 0.2;
-        } else {
-            // nagyon lassú "párolgás", hogy ne essen össze az érték
-            soilMoist -= 0.01;
+        PlantProfile profile = null;
+        if (greenhouse.getPlantProfileId() != null) {
+            profile = plantProfileRepository.findById(greenhouse.getPlantProfileId()).orElse(null);
         }
 
-        // clamp 0–100% közé
-        if (soilMoist < 0.0) {
-            soilMoist = 0.0;
-        } else if (soilMoist > 100.0) {
-            soilMoist = 100.0;
+        double plantFactor = computePlantUptakeFactor(greenhouse, intTemp, soil, profile);
+        double plantUptake = plantFactor * (1.0 + Math.max(0, (intTemp - 20.0)) / 20.0);
+        soil -= plantUptake;
+
+        // clamp profil szerint
+        double soilMax = 100.0;
+        double soilMin = 0.0;
+        if (profile != null && profile.getSoilMoistureRangePct() != null) {
+            if (profile.getSoilMoistureRangePct().max() != null) soilMax = profile.getSoilMoistureRangePct().max();
+            if (profile.getSoilMoistureRangePct().min() != null) soilMin = profile.getSoilMoistureRangePct().min();
+        }
+        soil = clamp(soil, 0.0, 100.0);
+        soil = Math.min(soil, soilMax);
+        soil = Math.max(soil, soilMin);
+
+        // ha túl nedves, automatikus kikapcsolás (ha nincs manuális védőidő)
+        if (Boolean.TRUE.equals(devices.isIrrigationOn()) && profile != null && profile.getSoilMoistureRangePct() != null) {
+            if (soil >= profile.getSoilMoistureRangePct().max()) {
+                soil = profile.getSoilMoistureRangePct().max();
+                if (!isUnderManualCooldown(devices, "IRRIGATION") && !isInCooldown(greenhouse, "IRRIGATION_OFF")) {
+                    devices.setIrrigationOn(false);
+                    setLastActionTimestamp(greenhouse, "IRRIGATION_OFF", now);
+                    log.info("Irrigation auto-OFF {} soil={}", greenhouse.getCode(), soil);
+                }
+            }
         }
 
-        // Ha elérte a 100%-ot, automatikusan kapcsoljuk le az öntözést
-        if (devices.isIrrigationOn() && soilMoist >= 99.5) {
-            soilMoist = 100.0;
-            devices.setIrrigationOn(false);
-            log.info(
-                    "Öntözés automatikus kikapcsolása üvegházban {}: a talaj nedvességtartalma elérte a 100%-ot",
-                    greenhouse.getCode()
-            );
+        // küszöbök profil alapján
+        double tempMin = profile != null && profile.getTemperatureRange() != null && profile.getTemperatureRange().min() != null
+                ? profile.getTemperatureRange().min() : -10.0;
+        double tempMax = profile != null && profile.getTemperatureRange() != null && profile.getTemperatureRange().max() != null
+                ? profile.getTemperatureRange().max() : 40.0;
+        double humMin = profile != null && profile.getHumidityRangePct() != null && profile.getHumidityRangePct().min() != null
+                ? profile.getHumidityRangePct().min() : 0.0;
+        double humMax = profile != null && profile.getHumidityRangePct() != null && profile.getHumidityRangePct().max() != null
+                ? profile.getHumidityRangePct().max() : 100.0;
+
+        double humMargin = Math.max(1.0, (humMax - humMin) * 0.05);
+        double humOnThreshold = Math.max(0.0, humMin + humMargin);
+        double humOffThreshold = humMax;
+
+        double soilRange = Math.max(1.0, soilMax - soilMin);
+        double soilMargin = Math.max(1.0, soilRange * 0.05);
+        double soilOnThreshold = Math.max(0.0, soilMin + soilMargin);
+        double soilOffThreshold = soilMax;
+
+        double tempOnForShade = tempMax + 0.5;
+        double tempOffForShade = tempMin;
+
+        // manuális védelem
+
+
+        // ÖNTÖZÉS (hysteresis)
+        if (!wasRecentlyManual(greenhouse, "IRRIGATION")) {
+            if (Boolean.TRUE.equals(devices.isIrrigationOn())) {
+                if (soil >= soilOffThreshold && !isInCooldown(greenhouse, "IRRIGATION_OFF")) {
+                    devices.setIrrigationOn(false);
+                    setLastActionTimestamp(greenhouse, "IRRIGATION_OFF", now);
+                    log.info("Irrigation auto-OFF {} soil={}", greenhouse.getCode(), soil);
+                }
+            } else {
+                if (soil <= soilOnThreshold && !isInCooldown(greenhouse, "IRRIGATION_ON")) {
+                    devices.setIrrigationOn(true);
+                    setLastActionTimestamp(greenhouse, "IRRIGATION_ON", now);
+                    log.info("Irrigation auto-ON {} soil={}", greenhouse.getCode(), soil);
+                }
+            }
         }
 
-        // ---------- SZENZOROK FRISSÍTÉSE ----------
-        upsertSensor(sensors, "INT_TEMP", Type.TEMPERATURE,      Unit.CELSIUS, intTemp,     now);
-        upsertSensor(sensors, "INT_HUMIDITY", Type.HUMIDITY_PCT, Unit.PERCENT, intHumidity, now);
-        upsertSensor(sensors, "SOIL_MOIST",   Type.SOILMOISTURE_PTC, Unit.PERCENT, soilMoist, now);
+        // PÁRÁSÍTÓ
+        if (!wasRecentlyManual(greenhouse, "HUMIDIFIER")) {
+            if (Boolean.TRUE.equals(devices.isHumidifierOn())) {
+                if (intHum >= humOffThreshold && !isInCooldown(greenhouse, "HUMIDIFIER_OFF")) {
+                    devices.setHumidifierOn(false);
+                    setLastActionTimestamp(greenhouse, "HUMIDIFIER_OFF", now);
+                    log.info("Humidifier auto-OFF {} hum={}", greenhouse.getCode(), intHum);
+                }
+            } else {
+                if (intHum <= humOnThreshold && !isInCooldown(greenhouse, "HUMIDIFIER_ON")) {
+                    devices.setHumidifierOn(true);
+                    setLastActionTimestamp(greenhouse, "HUMIDIFIER_ON", now);
+                    log.info("Humidifier auto-ON {} hum={}", greenhouse.getCode(), intHum);
+                }
+            }
+        }
+
+        // VILÁGÍTÁS és ÁRNYÉKOLÁS (temp alapú)
+        if (!wasRecentlyManual(greenhouse, "LIGHT")) {
+            if (Boolean.TRUE.equals(devices.isLightOn())) {
+                if (intTemp >= tempMax && !isInCooldown(greenhouse, "LIGHT_OFF")) {
+                    devices.setLightOn(false);
+                    setLastActionTimestamp(greenhouse, "LIGHT_OFF", now);
+                    log.info("Light auto-OFF {} temp={}", greenhouse.getCode(), intTemp);
+                }
+            } else {
+                if (intTemp <= tempMin && !isInCooldown(greenhouse, "LIGHT_ON")) {
+                    devices.setLightOn(true);
+                    setLastActionTimestamp(greenhouse, "LIGHT_ON", now);
+                    log.info("Light auto-ON {} temp={}", greenhouse.getCode(), intTemp);
+                }
+            }
+        }
+
+        if (!wasRecentlyManual(greenhouse, "SHADE")) {
+            if (Boolean.TRUE.equals(devices.isShadeOn())) {
+                if (intTemp <= tempOffForShade && !isInCooldown(greenhouse, "SHADE_OFF")) {
+                    devices.setShadeOn(false);
+                    setLastActionTimestamp(greenhouse, "SHADE_OFF", now);
+                    log.info("Shade auto-OFF {} temp={}", greenhouse.getCode(), intTemp);
+                }
+            } else {
+                if (intTemp >= tempOnForShade && !isInCooldown(greenhouse, "SHADE_ON")) {
+                    devices.setShadeOn(true);
+                    setLastActionTimestamp(greenhouse, "SHADE_ON", now);
+                    log.info("Shade auto-ON {} temp={}", greenhouse.getCode(), intTemp);
+                }
+            }
+        }
+
+        // SZELLŐZTETÉS: nyit, ha bármelyik kilóg; zár, ha mindkettő visszaáll
+        if (!wasRecentlyManual(greenhouse, "VENT")) {
+            boolean tempOut = (intTemp < tempMin) || (intTemp > tempMax);
+            boolean humOut = (intHum < humMin) || (intHum > humMax);
+
+            if (Boolean.TRUE.equals(devices.isVentOpen())) {
+                // zárás: ha semmi sem kilóg és nincs cooldown
+                if (!tempOut && !humOut && !isInCooldown(greenhouse, "VENT_CLOSE")) {
+                    devices.setVentOpen(false);
+                    setLastActionTimestamp(greenhouse, "VENT_CLOSE", now);
+                    log.info("Vent auto-CLOSE {}: temp={}, hum={}", greenhouse.getCode(), intTemp, intHum);
+                }
+            } else {
+                // nyitás: ha bármelyik kilóg és nincs cooldown
+                if ((tempOut || humOut) && !isInCooldown(greenhouse, "VENT_OPEN")) {
+                    devices.setVentOpen(true);
+                    setLastActionTimestamp(greenhouse, "VENT_OPEN", now);
+                    log.info("Vent auto-OPEN {}: temp={}, hum={}", greenhouse.getCode(), intTemp, intHum);
+                }
+            }
+        }
+
+        // SMOOTHING és upsert/update minden szenzorra
+        Instant ts = now;
+
+        Optional<SensorRef> sT = sensors.stream().filter(s -> s != null && s.code() != null && "INT_TEMP".equalsIgnoreCase(s.code())).findFirst();
+        double prevT = sT.map(SensorRef::lastValue).orElse(Double.NaN);
+        double smoothT = Double.isNaN(prevT) ? intTemp : smooth(prevT, intTemp, 0.2);
+        if (sT.isPresent()) updateSensorIfExists(sensors, sT.get().code(), Type.TEMPERATURE, Unit.CELSIUS, smoothT, ts);
+        else upsertInternalSensor(greenhouse, "INT_TEMP", Type.TEMPERATURE, Unit.CELSIUS, smoothT);
+
+        Optional<SensorRef> sH = sensors.stream().filter(s -> s != null && s.code() != null && "INT_HUMIDITY".equalsIgnoreCase(s.code())).findFirst();
+        double prevH = sH.map(SensorRef::lastValue).orElse(Double.NaN);
+        double smoothH = Double.isNaN(prevH) ? intHum : smooth(prevH, intHum, 0.15);
+        if (sH.isPresent()) updateSensorIfExists(sensors, sH.get().code(), Type.HUMIDITY_PCT, Unit.PERCENT, smoothH, ts);
+        else upsertInternalSensor(greenhouse, "INT_HUMIDITY", Type.HUMIDITY_PCT, Unit.PERCENT, smoothH);
+
+        if (sSoil.isPresent()) updateSensorIfExists(sensors, sSoil.get().code(), Type.SOILMOISTURE_PTC, Unit.PERCENT, soil, ts);
+        else upsertInternalSensor(greenhouse, "SOIL_MOIST", Type.SOILMOISTURE_PTC, Unit.PERCENT, soil);
+
+        Optional<SensorRef> sW = sensors.stream().filter(s -> s != null && s.code() != null && "WIND_SPEED".equalsIgnoreCase(s.code())).findFirst();
+        double prevW = sW.map(SensorRef::lastValue).orElse(Double.NaN);
+        double smoothW = Double.isNaN(prevW) ? intWind : smooth(prevW, intWind, 0.2);
+        if (sW.isPresent()) updateSensorIfExists(sensors, sW.get().code(), Type.WIND_SPEED, Unit.KILO_METER_PER_HOUR, smoothW, ts);
+        else upsertInternalSensor(greenhouse, "WIND_SPEED", Type.WIND_SPEED, Unit.KILO_METER_PER_HOUR, smoothW);
+
+        // profil szabályok smoothed értékekkel
+        evaluatePlantRules(greenhouse, profile, smoothT, smoothH, soil, smoothW);
+
+        greenhouseRepository.save(greenhouse);
+        log.debug("simulate {} -> temp={}, hum={}, soil={}, wind={}, devices={}",
+                greenhouse.getCode(), smoothT, smoothH, soil, smoothW, greenhouse.getDevices());
     }
 
-    private void upsertSensor(List<SensorRef> sensors,
-                              String code,
-                              Type type,
-                              Unit unit,
-                              Double value,
-                              Instant now) {
-
-        String id = code;
-
-        for (SensorRef s : sensors) {
-            if (code.equals(s.code())) {
-                id = s.id(); // ha már van ilyen kódú szenzor, az eredeti id-t megtartjuk
-                break;
-            }
-        }
-
-        SensorRef updated = new SensorRef(
-                id,
-                code,
-                type,
-                unit,
-                value,
-                now
-        );
-
-        sensors.removeIf(s -> code.equals(s.code()));
-        sensors.add(updated);
+    private boolean wasRecentlyManual(Greenhouse greenhouse, String groupKey) {
+        if (greenhouse == null || greenhouse.getDevices() == null) return false;
+        Map<String, Instant> lastManual = greenhouse.getDevices().getLastManualActionAt();
+        if (lastManual == null) return false;
+        String key = groupKey == null ? null : groupKey.toUpperCase(Locale.ROOT);
+        if (key == null) return false;
+        Instant last = lastManual.get(key);
+        return last != null && Instant.now().isBefore(last.plus(ACTION_COOLDOWN));
     }
 
-    @Scheduled(fixedRateString = "${greenhouse.simulation-interval-ms:5000}")
-    public void scheduledSimulation() {
-        List<Greenhouse> all = greenhouseRepository.findAll();
+    private boolean isUnderManualCooldown(DeviceState devices, String groupKey) {
+        if (devices == null || devices.getLastManualActionAt() == null || groupKey == null) return false;
+        Instant last = devices.getLastManualActionAt().get(groupKey);
+        if (last == null) return false;
+        return Instant.now().isBefore(last.plus(ACTION_COOLDOWN));
+    }
 
-        for (Greenhouse greenhouse : all) {
-            if (!greenhouse.isActive() || greenhouse.getLocation() == null) {
-                continue;
-            }
+    private void evaluatePlantRules(Greenhouse greenhouse,
+                                    PlantProfile profile,
+                                    double temp,
+                                    double hum,
+                                    double soil,
+                                    double wind) {
+        if (greenhouse == null || profile == null) return;
 
-            WeatherDto weather = weatherService.fetchForLocation(
-                    greenhouse.getLocation().city(),
-                    greenhouse.getLocation().lat(),
-                    greenhouse.getLocation().lon()
-            ).block();
+        Map<Type, Double> values = new HashMap<>();
+        values.put(Type.TEMPERATURE, temp);
+        values.put(Type.HUMIDITY_PCT, hum);
+        values.put(Type.SOILMOISTURE_PTC, soil);
+        values.put(Type.WIND_SPEED, wind);
 
-            if (weather == null) {
-                continue;
-            }
-
-            simulateInternalEnvironment(greenhouse, weather);
-            greenhouseRepository.save(greenhouse);
+        List<String> actions = ruleEvaluatorService.evaluate(profile, values);
+        if (actions != null && !actions.isEmpty()) {
+            applyActions(greenhouse, actions, "profile-rules");
         }
     }
 }
+//x

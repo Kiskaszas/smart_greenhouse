@@ -24,6 +24,11 @@ public class SensorController {
         sensorService.updateByCode(sensorCode, sensor);
     }
 
+    @DeleteMapping("/{greenhouseCode}/{sensorId}")
+    public void delete(@PathVariable("sensorId") String sensorId, @PathVariable("greenhouseCode") String greenhouseCode) {
+        sensorService.deleteByIdAndGreenhouseCode(sensorId, greenhouseCode);
+    }
+
     @GetMapping("/latest/{sensorCode}")
     public Optional<SensorData> latest(@PathVariable("sensorCode") String sensorCode) {
         return sensorService.latest(sensorCode);

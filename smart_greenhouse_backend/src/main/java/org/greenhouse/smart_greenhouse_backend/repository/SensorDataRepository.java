@@ -13,4 +13,6 @@ public interface SensorDataRepository extends MongoRepository<SensorData, String
     List<SensorData> findByCodeAndTimestampAfter(String sensorCode, Instant after);
 
     Optional<SensorData> findByCode(String sensorCode);
+
+    void deleteByIdAndGreenhouseCode(String sensorId, String greenhouseCode);
 }

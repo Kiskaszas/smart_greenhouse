@@ -1,15 +1,18 @@
 package org.greenhouse.smart_greenhouse_backend.model.documents;
 
-import lombok.*;
+import lombok.Data;
+import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.Location;
 import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.SensorRef;
-import org.greenhouse.smart_greenhouse_backend.model.auxiliaries.DeviceState;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Document("greenhouses")
@@ -29,4 +32,6 @@ public class Greenhouse {
 
     private String plantProfileId;
     private String planId;
+
+    private Map<String, Instant> lastActionAt = new HashMap<>();
 }

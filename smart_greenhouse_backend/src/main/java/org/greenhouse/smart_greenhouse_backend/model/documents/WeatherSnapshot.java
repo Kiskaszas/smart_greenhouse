@@ -24,7 +24,7 @@ public class WeatherSnapshot {
 
     private Double temperature; // °C
     private Double humidity;    // %
-    private Double windSpeed;   // m/s
+    private Double windSpeed;   // km/h
     private Double precipitationMm; // mm (aktuális/utolsó óra)
     private Double soilMoistureExtPct;
 }

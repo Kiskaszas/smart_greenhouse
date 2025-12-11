@@ -71,6 +71,24 @@ public interface GreenhouseService {
     Greenhouse addSensorData(final String code, final SensorRef sensor);
 
     /**
+     * Szenzoradat frisítése egy üvegházhoz.
+     *
+     * @param code az üvegház azonosítója
+     * @param sensor a szenzor objektum
+     * @return a frissített üvegház
+     */
+    Greenhouse updateSensorData(final String code, final SensorRef sensor);
+
+    /**
+     * Szenzoradat törlése egy üvegházról.
+     *
+     * @param code az üvegház azonosítója
+     * @param sensorId a szenzor azonosító
+     * @return a frissített üvegház
+     */
+    Greenhouse removeSensorData(final String code, final String sensorId);
+
+    /**
      * Egy üvegház eszközeinek aktuális állapotát adja vissza.
      *
      * @param code az üvegház azonosítója
@@ -151,8 +169,6 @@ public interface GreenhouseService {
      * naprakész adatok álljanak rendelkezésre az üvegházakhoz.
      */
     void pollAllGreenhouses();
-
-    Greenhouse createDemoGreenhouseIfNotExists();
 
     Greenhouse simulateNow(final String code);
 

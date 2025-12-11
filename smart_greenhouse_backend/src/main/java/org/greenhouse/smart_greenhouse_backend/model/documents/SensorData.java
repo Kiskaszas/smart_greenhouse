@@ -24,5 +24,5 @@ public class SensorData {
     private Double temperature;  // hűréskéklet-°C
     private Double humidity;     // nedvesség-%
     private Double soilMoisture; // talajnedvesség-%
-    private Double windSpeed;    // szélsebesség-m/s
+    private Double windSpeed;    // szélsebesség-km/h
 }

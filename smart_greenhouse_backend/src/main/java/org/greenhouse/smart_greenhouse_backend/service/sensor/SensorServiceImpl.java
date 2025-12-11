@@ -43,6 +43,11 @@ public class SensorServiceImpl implements SensorService {
         }
     }
 
+    @Override
+    public void deleteByIdAndGreenhouseCode(final String sensorId, final String greenhouseCode) {
+        sensorDataRepository.deleteByIdAndGreenhouseCode(sensorId, greenhouseCode);
+    }
+
     private SensorData getByCode(final String sensorCode) {
         return sensorDataRepository.findByCode(sensorCode)
                 .orElseThrow(() -> new RuntimeException("Sensor not found: " + sensorCode));

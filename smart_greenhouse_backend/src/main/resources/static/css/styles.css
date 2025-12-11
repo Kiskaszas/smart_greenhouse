@@ -119,6 +119,7 @@ body {
     flex-direction: column;
     gap: 8px;
     z-index: 1000;
+    opacity: 0.7;
 }
 
 .notification {
@@ -589,30 +590,42 @@ input:checked + .slider:before {
 
 .modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    backdrop-filter: blur(3px);
-    background: rgba(0,0,0,0.4);
+    inset: 0;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.45);
+    z-index: 1200;
+    padding: 20px; /* belső margó, hogy a modal-content ne érjen a képernyő széléhez */
+    box-sizing: border-box;
 }
 
 .modal.hidden {
-    display: none;
+    display: none !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
 }
 
 .modal-content {
+    width: 100%;
+    max-width: 640px;        /* tetszőleges max szélesség */
+    max-height: 80vh;        /* a viewport 80%-ánál ne legyen magasabb */
+    overflow: hidden;        /* a belső konténerek kezelik a görgetést */
     background: #fff;
-    padding: 24px;
-    width: 420px;
-    border-radius: 14px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: relative;
+}
+
+.modal-body-inner {
+    padding: 18px 20px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow: hidden;
 }
 
 .modal-buttons {
@@ -620,6 +633,65 @@ input:checked + .slider:before {
     justify-content: flex-end;
     gap: 10px;
     margin-top: 15px;
+}
+
+.form-compact .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.form-row-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.form-compact input[type="text"],
+.form-compact input[type="number"],
+.form-compact select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    font-size: 0.95rem;
+}
+
+.modal-body-inner h3 {
+    margin: 0 0 6px 0;
+    font-size: 1.15rem;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-close-top {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 5;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px;
+    cursor: pointer;
+    color: #374151;
+    border-radius: 6px;
+}
+.modal-close-top:hover { background: rgba(0,0,0,0.04); }
+
+/* ha mobilon túl szűk, legyen a modal belső görgethető */
+@media (max-width: 520px) {
+    .modal-content { max-width: 96%; }
+    .modal-body-inner { padding: 14px; }
+    .form-row-grid { grid-template-columns: 1fr; }
 }
 
 .card-subsection {
@@ -804,3 +876,71 @@ input:checked + .slider:before {
     padding: 4px 10px;
     font-size: 0.8rem;
 }
+
+.action-log-row {
+    display:flex;
+    gap:12px;
+    padding:8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.action-log-time { width:160px;
+    color:#6b7280;
+    font-size:0.9rem;
+}
+
+.action-log-action {
+    flex: 0 0 180px;
+
+}
+.action-log-reason {
+    color:#374151;
+    font-size:0.9rem;
+    flex:1;
+}
+
+#action-log-controls {
+    padding: 12px 16px;
+    border-bottom: 1px solid #eef2f7;
+    background: #fff;
+    z-index: 2;
+    flex: 0 0 auto;
+}
+#action-log-list {
+    padding: 12px 16px;
+    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 120px;
+}
+.modal-actions {
+    padding: 12px 16px;
+    border-top: 1px solid #eef2f7;
+    background: #fff;
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-content:focus { outline: none; }
+
+body.modal-open {
+    overflow: hidden;
+    touch-action: none;
+}
+#action-log-page-info { font-size:0.9rem; color:#374151; padding:4px 8px; }
+#action-log-prev[disabled], #action-log-next[disabled] { opacity:0.45; cursor:not-allowed; }
+
+.modal-close-top {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #374151;
+    padding: 6px;
+    border-radius: 6px;
+}
+.modal-close-top:hover { background: rgba(0,0,0,0.04); }
