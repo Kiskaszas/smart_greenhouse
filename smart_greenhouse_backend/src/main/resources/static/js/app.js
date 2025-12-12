@@ -928,7 +928,6 @@ async function loadActionLogPage(greenhouseCode, page = 0, size = 20) {
         } else if (data && data.content) {
             logs = data.content;
             totalPages = Number.isFinite(data.totalPages) ? data.totalPages : null;
-            totalElements = Number.isFinite(data.totalElements) ? data.totalElements : null;
         } else {
             // ha a backend limit paramot használ (pl. /actions?limit=20&offset=40) és tömböt ad vissza
             logs = Array.isArray(data) ? data : [];
@@ -1085,5 +1084,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSensorControls();
     setupActionLogModalControls();
     attachActionLogButton();
-    setInterval(() => loadGreenhouses(true), 1000);
+    setInterval(() => loadGreenhouses(true), 2000);
 });
