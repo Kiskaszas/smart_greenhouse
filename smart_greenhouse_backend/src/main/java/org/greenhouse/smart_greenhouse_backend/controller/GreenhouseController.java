@@ -171,7 +171,13 @@ public class GreenhouseController {
         return service.simulateNow(code);
     }
 
-    // ActionLogController.java (vagy GreenhouseController-be illeszd)
+    @Operation(
+            summary = "Akciónapló lekérése egy üvegházhoz",
+            description = "Visszaadja az adott üvegházhoz tartozó akciónaplót lapozható formában. "
+                    + "Az akciók időrendben (timestamp szerint) csökkenő sorrendben érkeznek."
+    )
+    @ApiResponse(responseCode = "200", description = "Sikeres lekérés, a válaszban Page<ActionLog> objektum található")
+    @ApiResponse(responseCode = "404", description = "Nem található üvegház a megadott kóddal")
     @GetMapping("/{code}/actions")
     public ResponseEntity<Page<ActionLog>> getActionLogs(
             @PathVariable("code") String code,

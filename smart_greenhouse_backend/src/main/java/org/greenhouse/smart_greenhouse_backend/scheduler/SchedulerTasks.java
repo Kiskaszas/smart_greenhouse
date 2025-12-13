@@ -64,7 +64,7 @@ public class SchedulerTasks {
         service.generatePlans();
     }
 
-    @Scheduled(cron = "0/10 * * * * *") // 30 percenként az ajánlott beállítás de most csak 30 mp
+    @Scheduled(cron = "* 0/30 * * * *")
     public void pollAllGreenhouses() {
         service.pollAllGreenhouses();
     }

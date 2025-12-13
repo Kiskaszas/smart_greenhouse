@@ -1084,5 +1084,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSensorControls();
     setupActionLogModalControls();
     attachActionLogButton();
-    setInterval(() => loadGreenhouses(true), 2000);
+    setInterval(() => loadGreenhouses(true), 30000);
 });

@@ -195,13 +195,22 @@ public class GreenhouseServiceImpl implements GreenhouseService {
 
     @Override
     public DeviceState manualAction(final String id, final String action) {
+        // Lekérjük az üvegház objektumot azonosító (code/id) alapján
         Greenhouse greenhouse = getByCode(id);
+
+        // Ha az üvegházhoz még nincs DeviceState példány, létrehozunk egyet
         if (greenhouse.getDevices() == null) greenhouse.setDevices(new DeviceState());
+
+        // Lekérjük az eszközállapotot
         DeviceState devices = greenhouse.getDevices();
+
+        // Ha még nincs inicializálva a kézi akciók időbélyegzőit tároló map, létrehozzuk
         if (devices.getLastManualActionAt() == null) devices.setLastManualActionAt(new HashMap<>());
 
+        // Normalizáljuk az action stringet: nagybetűsítjük és levágjuk a felesleges whitespace-t
         String normalized = action == null ? "" : action.toUpperCase(Locale.ROOT).trim();
 
+        // Meghatározzuk, melyik eszközcsoporthoz tartozik az adott akció (öntözés, szellőztetés, stb.)
         String manualKey = switch (normalized) {
             case "IRRIGATION_ON", "IRRIGATION_OFF" -> "IRRIGATION";
             case "VENT_OPEN", "VENT_CLOSE" -> "VENT";
@@ -211,6 +220,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             default -> null;
         };
 
+        // Az akció alapján beállítjuk az adott eszköz állapotát (true = bekapcsolva/nyitva, false = kikapcsolva/zárva)
         switch (normalized) {
             case "IRRIGATION_ON" -> devices.setIrrigationOn(true);
             case "IRRIGATION_OFF" -> devices.setIrrigationOn(false);
@@ -222,30 +232,38 @@ public class GreenhouseServiceImpl implements GreenhouseService {
             case "LIGHT_OFF" -> devices.setLightOn(false);
             case "HUMIDIFIER_ON" -> devices.setHumidifierOn(true);
             case "HUMIDIFIER_OFF" -> devices.setHumidifierOn(false);
-            default -> throw new IllegalArgumentException("Unknown action: " + action);
+            default -> throw new IllegalArgumentException("Ismeretlen akció: " + action);
         }
 
+        // Az adott eszközcsoporthoz eltároljuk, mikor történt utoljára kézi beavatkozás
         String key = manualKey.toUpperCase(Locale.ROOT);
         devices.getLastManualActionAt().put(key, Instant.now());
+
+        // Az üvegház szintjén is frissítjük az utolsó akció időbélyegét
         setLastActionTimestamp(greenhouse, key, Instant.now());
+
+        // Elmentjük az üvegház állapotát az adatbázisba
         greenhouseRepository.save(greenhouse);
 
+        // Létrehozunk egy ActionLog bejegyzést, hogy naplózzuk a kézi akciót
         ActionLog actionLog = new ActionLog();
         actionLog.setGreenhouseCode(id);
         actionLog.setTimestamp(Instant.now());
         actionLog.setAction(action);
-        actionLog.setReason("manual");
+        actionLog.setReason("manual"); // ok: kézi beavatkozás
         actionLogRepository.save(actionLog);
 
-        // Azonnali simulate, hogy a frontend a friss szenzorokat kapja
+        // Azonnal lefuttatjuk a szimulációt, hogy a frontend friss szenzorértékeket kapjon
         try {
             WeatherDto weather = fetchWeatherForGreenhouse(id);
             simulateInternalEnvironment(greenhouse, weather);
             greenhouseRepository.save(greenhouse);
         } catch (Exception e) {
-            log.debug("simulate after manual action failed for {}: {}", id, e.getMessage());
+            // Ha a szimuláció hibára fut, debug logban jelezzük
+            log.debug("Szimuláció a kézi művelet után sikertelen {}: {}", id, e.getMessage());
         }
 
+        // Visszaadjuk az aktuális eszközállapotot
         return devices;
     }
 
@@ -374,7 +392,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         // Ha nincs plantProfileId, de van plantType, próbáljuk meg betölteni a resources-ból
         String plantType = greenhouse.getPlantType();
         if (plantType == null || plantType.isBlank()) {
-            log.debug("No plantType for greenhouse {}, cannot load profile from resources", greenhouse.getCode());
+            log.debug("Nincs növénytípus az üvegházhoz {}, nem lehet betölteni a profilt az resources-ből", greenhouse.getCode());
             return null;
         }
 
@@ -398,13 +416,13 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 PlantProfile saved = plantProfileRepository.save(loaded);
                 greenhouse.setPlantProfileId(saved.getId());
                 greenhouseRepository.save(greenhouse);
-                log.info("Loaded plant profile for greenhouse {} from resources: {}", greenhouse.getCode(), plantType);
+                log.info("A {} üvegház növényprofilja betöltődött a következő resources: {}", greenhouse.getCode(), plantType);
                 return saved;
             } else {
-                log.debug("PlantProfileLoader returned null for plantType {}", plantType);
+                log.debug("A PlantProfileLoader null értéket adott vissza a plantType esetében. {}", plantType);
             }
         } catch (Exception e) {
-            log.warn("Failed to load plant profile for type {} from resources: {}", plantType, e.getMessage());
+            log.warn("Nem sikerült betölteni a(z) {} típus növényprofilját a resources-ből: {}", plantType, e.getMessage());
         }
 
         return null;
@@ -547,12 +565,12 @@ public class GreenhouseServiceImpl implements GreenhouseService {
 
         for (String action : actions) {
             if (!shouldApplyAction(greenhouse, action)) {
-                log.debug("Skipping action {} for {} because shouldApplyAction returned false", action, greenhouse.getCode());
+                log.debug("A {} művelet kihagyása a következőhöz: {}, mert a shouldApplyAction értéke hamis volt", action, greenhouse.getCode());
                 continue;
             }
 
             if (isInCooldown(greenhouse, action)) {
-                log.debug("Skipping action {} for {} due to cooldown", action, greenhouse.getCode());
+                log.debug("Akció kihagyása {}-ra {}-ra a lehűlési idő miatt", action, greenhouse.getCode());
                 continue;
             }
 
@@ -637,9 +655,9 @@ public class GreenhouseServiceImpl implements GreenhouseService {
 
         if (changed) {
             greenhouseRepository.save(greenhouse);
-            log.info("Saved greenhouse {} after applying actions, devices: {}", greenhouse.getCode(), greenhouse.getDevices());
+            log.info("Mentett üvegház {} műveletek és eszközök alkalmazása után: {}", greenhouse.getCode(), greenhouse.getDevices());
         } else {
-            log.debug("No device changes for {}, skipping save", greenhouse.getCode());
+            log.debug("Nincsenek eszközváltozások a következőhöz: {}, a mentés kihagyásra kerül.", greenhouse.getCode());
         }
     }
 
@@ -892,7 +910,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 if (!isUnderManualCooldown(devices, "IRRIGATION") && !isInCooldown(greenhouse, "IRRIGATION_OFF")) {
                     devices.setIrrigationOn(false);
                     setLastActionTimestamp(greenhouse, "IRRIGATION_OFF", now);
-                    log.info("Irrigation auto-OFF {} soil={}", greenhouse.getCode(), soil);
+                    log.info("Öntözés automatikus kikapcsolása {} talaj nedvességtartalma={}", greenhouse.getCode(), soil);
                 }
             }
         }
@@ -928,13 +946,13 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 if (soil >= soilOffThreshold && !isInCooldown(greenhouse, "IRRIGATION_OFF")) {
                     devices.setIrrigationOn(false);
                     setLastActionTimestamp(greenhouse, "IRRIGATION_OFF", now);
-                    log.info("Irrigation auto-OFF {} soil={}", greenhouse.getCode(), soil);
+                    log.info("Öntözés automatikus kikapcsolása {} talaj nedvességtartalma={}", greenhouse.getCode(), soil);
                 }
             } else {
                 if (soil <= soilOnThreshold && !isInCooldown(greenhouse, "IRRIGATION_ON")) {
                     devices.setIrrigationOn(true);
                     setLastActionTimestamp(greenhouse, "IRRIGATION_ON", now);
-                    log.info("Irrigation auto-ON {} soil={}", greenhouse.getCode(), soil);
+                    log.info("Öntözés automatikus kikapcsolása {} talaj nedvességtartalma={}", greenhouse.getCode(), soil);
                 }
             }
         }
@@ -945,13 +963,13 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 if (intHum >= humOffThreshold && !isInCooldown(greenhouse, "HUMIDIFIER_OFF")) {
                     devices.setHumidifierOn(false);
                     setLastActionTimestamp(greenhouse, "HUMIDIFIER_OFF", now);
-                    log.info("Humidifier auto-OFF {} hum={}", greenhouse.getCode(), intHum);
+                    log.info("Párásító automatikus kikapcsolása {} párásító ={}", greenhouse.getCode(), intHum);
                 }
             } else {
                 if (intHum <= humOnThreshold && !isInCooldown(greenhouse, "HUMIDIFIER_ON")) {
                     devices.setHumidifierOn(true);
                     setLastActionTimestamp(greenhouse, "HUMIDIFIER_ON", now);
-                    log.info("Humidifier auto-ON {} hum={}", greenhouse.getCode(), intHum);
+                    log.info("Párásító automatikus kikapcsolása {} párásító ={}", greenhouse.getCode(), intHum);
                 }
             }
         }
@@ -962,13 +980,13 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 if (intTemp >= tempMax && !isInCooldown(greenhouse, "LIGHT_OFF")) {
                     devices.setLightOn(false);
                     setLastActionTimestamp(greenhouse, "LIGHT_OFF", now);
-                    log.info("Light auto-OFF {} temp={}", greenhouse.getCode(), intTemp);
+                    log.info("Lámpa automatikus kikapcsolás {} hőmérséklet={}", greenhouse.getCode(), intTemp);
                 }
             } else {
                 if (intTemp <= tempMin && !isInCooldown(greenhouse, "LIGHT_ON")) {
                     devices.setLightOn(true);
                     setLastActionTimestamp(greenhouse, "LIGHT_ON", now);
-                    log.info("Light auto-ON {} temp={}", greenhouse.getCode(), intTemp);
+                    log.info("Lámpa automatikus bekapcsolása {} hőmérséklet={}", greenhouse.getCode(), intTemp);
                 }
             }
         }
@@ -978,13 +996,13 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 if (intTemp <= tempOffForShade && !isInCooldown(greenhouse, "SHADE_OFF")) {
                     devices.setShadeOn(false);
                     setLastActionTimestamp(greenhouse, "SHADE_OFF", now);
-                    log.info("Shade auto-OFF {} temp={}", greenhouse.getCode(), intTemp);
+                    log.info("Árnyékoló automatikus kikapcsolása {} hőmérséklet={}", greenhouse.getCode(), intTemp);
                 }
             } else {
                 if (intTemp >= tempOnForShade && !isInCooldown(greenhouse, "SHADE_ON")) {
                     devices.setShadeOn(true);
                     setLastActionTimestamp(greenhouse, "SHADE_ON", now);
-                    log.info("Shade auto-ON {} temp={}", greenhouse.getCode(), intTemp);
+                    log.info("Árnyékoló automatikus bekapcsolása {} hőmérséklet={}", greenhouse.getCode(), intTemp);
                 }
             }
         }
@@ -999,15 +1017,14 @@ public class GreenhouseServiceImpl implements GreenhouseService {
                 if (!tempOut && !humOut && !isInCooldown(greenhouse, "VENT_CLOSE")) {
                     devices.setVentOpen(false);
                     setLastActionTimestamp(greenhouse, "VENT_CLOSE", now);
-                    log.info("Vent auto-CLOSE {}: temp={}, hum={}", greenhouse.getCode(), intTemp, intHum);
+                    log.info("Szellőztetés automatikus bezárása {}: hőmérséklet={}, páratartalom={}", greenhouse.getCode(), intTemp, intHum);
                 }
             } else {
                 // nyitás: ha bármelyik kilóg és nincs cooldown
                 if ((tempOut || humOut) && !isInCooldown(greenhouse, "VENT_OPEN")) {
                     devices.setVentOpen(true);
                     setLastActionTimestamp(greenhouse, "VENT_OPEN", now);
-                    log.info("Vent auto-OPEN {}: temp={}, hum={}", greenhouse.getCode(), intTemp, intHum);
-                }
+                    log.info("Szellőztetés automatikus megnyitása {}: hőmérséklet={}, páratartalom={}", greenhouse.getCode(), intTemp, intHum);                }
             }
         }
 
@@ -1039,7 +1056,7 @@ public class GreenhouseServiceImpl implements GreenhouseService {
         evaluatePlantRules(greenhouse, profile, smoothT, smoothH, soil, smoothW);
 
         greenhouseRepository.save(greenhouse);
-        log.debug("simulate {} -> temp={}, hum={}, soil={}, wind={}, devices={}",
+        log.debug("Szimuláció {} -> hőmérséklet={}, páratartalom={}, talajnedvesség={}, szélsebesség={}, eszközök={}",
                 greenhouse.getCode(), smoothT, smoothH, soil, smoothW, greenhouse.getDevices());
     }
 
